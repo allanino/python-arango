@@ -10,6 +10,15 @@ Python-Arango is a Python driver for ArangoDB(<https://www.arangodb.com/>).
 
 It is compatible with Python versions 2.7 and 3.4.
 
+Announcements
+-------------
+
+There will be a complete overhaul of python-arango in the next month or so 
+in release v3.0.0 accompanied by proper documentation. Unfortunately, this
+comes with many API changes that are **not** backward-compatible. I apologize
+in advance if this causes you any inconvenience. But I promise you that the
+changes will absolutely be for the better!
+
 Installation
 ------------
 
