@@ -80,7 +80,7 @@ def test_query_execute():
         db.query.execute('THIS IS AN INVALID QUERY')
 
     # Test valid AQL query #1
-    db.collection(col_name).insert_many([
+    db.collection(col_name).insert_bulk([
         {"_key": "doc01"},
         {"_key": "doc02"},
         {"_key": "doc03"},
@@ -95,7 +95,7 @@ def test_query_execute():
     assert set(d['_key'] for d in result) == {'doc01', 'doc02', 'doc03'}
 
     # Test valid AQL query #2
-    db.collection(col_name).insert_many([
+    db.collection(col_name).insert_bulk([
         {"_key": "doc04", "value": 1},
         {"_key": "doc05", "value": 1},
         {"_key": "doc06", "value": 3},
@@ -148,20 +148,20 @@ def test_query_function_delete_and_list():
 
 @pytest.mark.order6
 def test_get_query_cache_options():
-    options = db.query.cache.options()
+    options = db.query.cache.properties()
     assert 'mode' in options
     assert 'limit' in options
 
 
 @pytest.mark.order7
 def test_set_query_cache_options():
-    options = db.query.cache.set_options(
+    options = db.query.cache.set_properties(
         mode='on', limit=100
     )
     assert options['mode'] == 'on'
     assert options['limit'] == 100
 
-    options = db.query.cache.options()
+    options = db.query.cache.properties()
     assert options['mode'] == 'on'
     assert options['limit'] == 100
 

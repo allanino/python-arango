@@ -22,7 +22,7 @@ class WriteAheadLog(object):
     def __repr__(self):
         return "<ArangoDB write-ahead log>"
 
-    def options(self):
+    def properties(self):
         """Return the configuration of the write-ahead log.
 
         :returns: the configuration of the write-ahead log
@@ -42,9 +42,9 @@ class WriteAheadLog(object):
             'throttle_limit': res.body.get('throttleWhenPending')
         }
 
-    def set_options(self, oversized_ops=None, log_size=None,
-                    historic_logs=None, reserve_logs=None,
-                    throttle_wait=None, throttle_limit=None):
+    def set_properties(self, oversized_ops=None, log_size=None,
+                       historic_logs=None, reserve_logs=None,
+                       throttle_wait=None, throttle_limit=None):
         """Configure the parameters of the write-ahead log.
 
         Setting ``throttle_when_pending`` to 0 disables the throttling.

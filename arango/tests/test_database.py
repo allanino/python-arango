@@ -78,7 +78,7 @@ def test_create_collection():
         shard_count=2,
         shard_fields=["test_attr"]
     )
-    options = col.options()
+    options = col.properties()
     assert 'id' in options
     assert options['name'] == col_name_2
     assert options['sync'] == True

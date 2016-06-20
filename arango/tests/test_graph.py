@@ -303,161 +303,154 @@ def test_insert_vertex():
 
 @pytest.mark.order11
 def test_get_vertex():
+    vcol = graph.vertex_collection('vcol1')
     vertex1 = {'_key': '1', 'value': 1}
     vertex2 = {'_key': '2', 'value': 2}
 
     # Test get missing vertex
-    assert graph.get_vertex('vcol1', '0') is None
+    assert vcol.find_by_key('0') is None
 
     # Test get existing vertex
-    result = graph.get_vertex('vcol1', '1')
+    result = vcol.find_by_key('1')
     old_rev = result['_rev']
     assert clean_keys(result) == vertex1
 
     # Test get existing vertex with wrong revision
     new_rev = str(int(old_rev) + 1)
     with pytest.raises(VertexRevisionError):
-        graph.get_vertex('vcol1', '1', new_rev)
+        vcol.find_by_key('1', new_rev)
 
-    assert clean_keys(graph.get_vertex('vcol1', '2')) == vertex2
+    assert clean_keys(vcol.find_by_key('2')) == vertex2
 
 
 @pytest.mark.order12
 def test_update_vertex():
-    assert 'foo' not in graph.get_vertex('vcol1', '1')
-    assert graph.update_vertex('vcol1', '1', {'foo': 100})
-    assert graph.get_vertex('vcol1', '1')['foo'] == 100
+    vcol = graph.vertex_collection('vcol1')
+    assert 'foo' not in vcol.find_by_key('1')
+    assert vcol.update_by_key('1', {'foo': 100})
+    assert vcol.find_by_key('1')['foo'] == 100
 
-    result = graph.update_vertex('vcol1', '1', {'foo': 200, 'bar': 300})
+    result = vcol.update_by_key('1', {'foo': 200, 'bar': 300})
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result
     assert '_rev' in result
 
-    result = graph.get_vertex('vcol1', '1')
+    result = vcol.find_by_key('1')
     assert result['foo'] == 200
     assert result['bar'] == 300
     old_rev = result['_rev']
 
-    result = graph.update_vertex(
-        'vcol1', '1', {'bar': 500}, revision=old_rev
-    )
+    result = vcol.update_by_key('1', {'bar': 500}, rev=old_rev)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result
     assert '_rev' in result
 
-    assert graph.get_vertex('vcol1', '1')['bar'] == 500
+    assert vcol.find_by_key('1')['bar'] == 500
 
     new_rev = str(int(old_rev) + 10)
     with pytest.raises(VertexRevisionError):
-        graph.update_vertex('vcol1', '1', {'bar': 600}, revision=new_rev)
-    assert graph.get_vertex('vcol1', '1')['bar'] == 500
+        vcol.update_by_key('1', {'bar': 600}, rev=new_rev)
+    assert vcol.find_by_key('1')['bar'] == 500
 
-    result = graph.update_vertex('vcol1', '1', {'bar': 400}, sync=True)
+    result = vcol.update_by_key('1', {'bar': 400}, sync=True)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
-    assert graph.get_vertex('vcol1', '1')['foo'] == 200
-    assert graph.get_vertex('vcol1', '1')['bar'] == 400
+    assert vcol.find_by_key('1')['foo'] == 200
+    assert vcol.find_by_key('1')['bar'] == 400
 
-    result = graph.update_vertex('vcol1', '1', {'bar': None}, keep_none=True)
+    result = vcol.update_by_key('1', {'bar': None}, keep_none=True)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
-    assert graph.get_vertex('vcol1', '1')['bar'] is None
+    assert vcol.find_by_key('1')['bar'] is None
 
-    result = graph.update_vertex(
-        'vcol1', '1', {'foo': None}, keep_none=False
-    )
+    result = vcol.update_by_key('1', {'foo': None}, keep_none=False)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
-    assert graph.get_vertex('vcol1', '1')['bar'] is None
-    assert 'foo' not in graph.get_vertex('vcol1', '1')
+    assert vcol.find_by_key('1')['bar'] is None
+    assert 'foo' not in vcol.find_by_key('1')
 
 
 @pytest.mark.order13
 def test_replace_vertex():
+    vcol = graph.vertex_collection('vcol1')
+
     # Check precondition
-    assert 'bar' in graph.get_vertex('vcol1', '1')
-    assert 'value' in graph.get_vertex('vcol1', '1')
+    assert 'bar' in vcol.find_by_key('1')
+    assert 'value' in vcol.find_by_key('1')
 
     #
-    result = graph.replace_vertex('vcol1', '1', {'baz': 100})
+    result = vcol.replace_by_key('1', {'baz': 100})
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
-    assert graph.get_vertex('vcol1', '1')['baz'] == 100
-    assert 'bar' not in graph.get_vertex('vcol1', '1')
-    assert 'value' not in graph.get_vertex('vcol1', '1')
+    assert vcol.find_by_key('1')['baz'] == 100
+    assert 'bar' not in vcol.find_by_key('1')
+    assert 'value' not in vcol.find_by_key('1')
 
-    result = graph.replace_vertex('vcol1', '1', {'foo': 200, 'bar': 300})
+    result = vcol.replace_by_key('1', {'foo': 200, 'bar': 300})
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
 
-    result = graph.get_vertex('vcol1', '1')
+    result = vcol.find_by_key('1')
     assert clean_keys(result) == {'_key': '1', 'foo': 200, 'bar': 300}
     old_rev = result['_rev']
 
-    result = graph.replace_vertex('vcol1', '1', {'bar': 500}, revision=old_rev)
+    result = vcol.replace_by_key('1', {'bar': 500}, rev=old_rev)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
-    assert graph.get_vertex('vcol1', '1')['bar'] == 500
-    assert 'foo' not in graph.get_vertex('vcol1', '1')
+    assert vcol.find_by_key('1')['bar'] == 500
+    assert 'foo' not in vcol.find_by_key('1')
 
     new_rev = str(int(old_rev) + 10)
     with pytest.raises(VertexRevisionError):
-        graph.replace_vertex('vcol1', '1', {'bar': 600}, revision=new_rev)
-    assert graph.get_vertex('vcol1', '1')['bar'] == 500
-    assert 'foo' not in graph.get_vertex('vcol1', '1')
+        vcol.replace_by_key('1', {'bar': 600}, rev=new_rev)
+    assert vcol.find_by_key('1')['bar'] == 500
+    assert 'foo' not in vcol.find_by_key('1')
 
-    result = graph.replace_vertex(
-        'vcol1', '1', {'bar': 400, 'foo': 200}, sync=True
-    )
+    result = vcol.replace_by_key('1', {'bar': 400, 'foo': 200}, sync=True)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
-    assert graph.get_vertex('vcol1', '1')['foo'] == 200
-    assert graph.get_vertex('vcol1', '1')['bar'] == 400
+    assert vcol.find_by_key('1')['foo'] == 200
+    assert vcol.find_by_key('1')['bar'] == 400
 
 
 @pytest.mark.order14
 def test_delete_vertex():
-    vcol = db.collection('vcol1')
+    vcol = graph.vertex_collection('vcol1')
     vcol.truncate()
-    vcol.insert_many([
-        {'_key': '1', 'value': 1},
-        {'_key': '2', 'value': 2},
-        {'_key': '3', 'value': 3}
-    ])
+    vcol.insert({'_key': '1', 'value': 1})
+    vcol.insert({'_key': '2', 'value': 2})
+    vcol.insert({'_key': '3', 'value': 3})
 
     # Test vertex delete
-    assert graph.delete_vertex('vcol1', '1') == True
-    assert graph.get_vertex('vcol1', '1') is None
+    assert vcol.delete_by_key('1') == True
+    assert vcol.find_by_key('1') is None
     assert '1' not in vcol
 
     # Test vertex delete with sync
-    assert graph.delete_vertex('vcol1', '3', sync=True) == True
-    assert graph.get_vertex('vcol1', '3') is None
+    assert vcol.delete_by_key('3', sync=True) == True
+    assert vcol.find_by_key('3') is None
     assert '3' not in vcol
 
     # Test delete vertex with incorrect revision
-    old_rev = graph.get_vertex('vcol1', '2')['_rev']
+    old_rev = vcol.find_by_key('2')['_rev']
     new_rev = str(int(old_rev) + 10)
     with pytest.raises(VertexRevisionError):
-        graph.delete_vertex('vcol1', '2', revision=new_rev)
+        vcol.delete_by_key('2', rev=new_rev)
     assert '2' in vcol
 
     # Test delete vertex from missing collection
     with pytest.raises(VertexDeleteError):
-        graph.delete_vertex('missing', '1', ignore_missing=False)
+        graph.vertex_collection('missing').delete_by_key('1', ignore_missing=False)
 
     # Test delete missing vertex
     with pytest.raises(VertexDeleteError):
-        graph.delete_vertex('vcol1', '10', ignore_missing=False)
+        vcol.delete_by_key('10', ignore_missing=False)
 
 
 @pytest.mark.order15
 def test_insert_edge():
     ecol = db.collection('ecol2', edge=True)
     ecol.truncate()
-    graph.insert_edge(ecol.name, )
-
-
 
 
 @pytest.mark.order16

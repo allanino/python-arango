@@ -21,7 +21,7 @@ ecol.add_geo_index(['coordinates'])
 
 # Set up test collection and edges
 col = generate_col_name(db)
-db.create_collection(col).insert_many([
+db.create_collection(col).insert_bulk([
     {'_key': '1'}, {'_key': '2'}, {'_key': '3'}, {'_key': '4'}
 ])
 edge1 = {'_key': '1', '_from': '{}/1'.format(col), '_to': '{}/2'.format(col)}
@@ -44,7 +44,7 @@ def test_properties():
 
 
 def test_options():
-    options = ecol.options()
+    options = ecol.properties()
     assert 'id' in options
     assert options['status'] in COLLECTION_STATUSES.values()
     assert options['name'] == ecol_name
@@ -63,17 +63,17 @@ def test_options():
 
 
 def test_set_options():
-    options = ecol.options()
+    options = ecol.properties()
     old_sync = options['sync']
     old_journal_size = options['journal_size']
 
     new_sync = not old_sync
     new_journal_size = old_journal_size + 1
-    result = ecol.set_options(
+    result = ecol.set_properties(
         sync=new_sync, journal_size=new_journal_size
     )
     assert isinstance(result, bool)
-    new_options = ecol.options()
+    new_options = ecol.properties()
     assert new_options['sync'] == new_sync
     assert new_options['journal_size'] == new_journal_size
 
@@ -154,7 +154,7 @@ def test_insert():
     assert '1' in ecol
     assert len(ecol) == 1
 
-    edge = ecol.get('1')
+    edge = ecol.find_by_key('1')
     assert edge['_key'] == '1'
     assert edge['_from'] == edge1['_from']
     assert edge['_to'] == edge1['_to']
@@ -165,7 +165,7 @@ def test_insert():
     assert '2' in ecol
     assert len(ecol) == 2
 
-    edge = ecol.get('2')
+    edge = ecol.find_by_key('2')
     assert edge['_key'] == '2'
     assert edge['_from'] == edge2['_from']
     assert edge['_to'] == edge2['_to']
@@ -178,25 +178,25 @@ def test_insert():
 
 
 def test_insert_many():
-    result = ecol.insert_many([edge1, edge2, edge3])
+    result = ecol.insert_bulk([edge1, edge2, edge3])
     assert result['created'] == 3
     assert result['errors'] == 0
     assert 'details' in result
     assert len(ecol) == 3
     for key in range(1, 4):
         assert key in ecol
-        edge = ecol.get(key)
+        edge = ecol.find_by_key(key)
         assert edge['_key'] == str(key)
 
     with pytest.raises(DocumentInsertError):
-        ecol.insert_many([edge1, edge2], halt_on_error=True)
+        ecol.insert_bulk([edge1, edge2], halt_on_error=True)
 
-    result = ecol.insert_many([edge1, edge2], halt_on_error=False)
+    result = ecol.insert_bulk([edge1, edge2], halt_on_error=False)
     assert result['created'] == 0
     assert result['errors'] == 2
     assert 'details' in result
 
-    result = ecol.insert_many([edge4], details=False)
+    result = ecol.insert_bulk([edge4], details=False)
     assert result['created'] == 1
     assert result['errors'] == 0
     assert 'details' not in result
@@ -204,58 +204,58 @@ def test_insert_many():
 
 def test_get():
     ecol.insert(edge1)
-    edge = ecol.get('1')
+    edge = ecol.find_by_key('1')
     assert edge['_key'] == '1'
     assert edge['_from'] == edge1['_from']
     assert edge['_to'] == edge1['_to']
-    assert ecol.get('2') is None
+    assert ecol.find_by_key('2') is None
 
     old_rev = edge['_rev']
     new_rev = str(int(old_rev) + 1)
-    assert ecol.get('1', revision=old_rev) == edge
+    assert ecol.find_by_key('1', rev=old_rev) == edge
 
     with pytest.raises(DocumentRevisionError):
-        ecol.get('1', revision=new_rev)
+        ecol.find_by_key('1', rev=new_rev)
 
 
 def test_get_many():
-    assert ecol.get_many(['1', '2', '3', '4', '5']) == []
+    assert ecol.find_by_keys(['1', '2', '3', '4', '5']) == []
     expected = [edge1, edge2, edge3, edge4]
-    ecol.insert_many(expected)
-    assert ecol.get_many([]) == []
+    ecol.insert_bulk(expected)
+    assert ecol.find_by_keys([]) == []
     assert expected == [
         {'_key': edge['_key'], '_from': edge['_from'], '_to': edge['_to']}
-        for edge in ecol.get_many(['1', '2', '3', '4'])
+        for edge in ecol.find_by_keys(['1', '2', '3', '4'])
     ]
     assert expected == [
         {'_key': edge['_key'], '_from': edge['_from'], '_to': edge['_to']}
-        for edge in ecol.get_many(['1', '2', '3', '4', '5', '6'])
+        for edge in ecol.find_by_keys(['1', '2', '3', '4', '5', '6'])
     ]
 
 
 def test_update():
     ecol.insert(edge1)
-    edge = ecol.update('1', {'value': 200})
+    edge = ecol.update_by_key('1', {'value': 200})
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] == 200
 
-    edge = ecol.update('1', {'value': None}, keep_none=True)
+    edge = ecol.update_by_key('1', {'value': None}, keep_none=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] is None
 
-    edge = ecol.update('1', {'value': {'bar': 1}}, sync=True)
+    edge = ecol.update_by_key('1', {'value': {'bar': 1}}, sync=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] == {'bar': 1}
 
-    edge = ecol.update('1', {'value': {'baz': 2}}, merge=True)
+    edge = ecol.update_by_key('1', {'value': {'baz': 2}}, merge=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] == {'bar': 1, 'baz': 2}
 
-    edge = ecol.update('1', {'value': None}, keep_none=False)
+    edge = ecol.update_by_key('1', {'value': None}, keep_none=False)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert 'value' not in ecol['1']
@@ -264,31 +264,31 @@ def test_update():
     new_rev = str(int(old_rev) + 1)
 
     with pytest.raises(DocumentRevisionError):
-        ecol.update('1', {'value': 300, '_rev': new_rev})
+        ecol.update_by_key('1', {'value': 300, '_rev': new_rev})
     assert 'value' not in ecol['1']
 
     with pytest.raises(DocumentUpdateError):
-        ecol.update('2', {'value': 300})
+        ecol.update_by_key('2', {'value': 300})
     assert 'value' not in ecol['1']
 
     # This update should be ignored
-    ecol.update('1', {'_to': '{}/3'.format(col)})
+    ecol.update_by_key('1', {'_to': '{}/3'.format(col)})
     assert ecol['1']['_to'] == '{}/2'.format(col)
 
 
 def test_replace():
     ecol.insert(edge1)
-    edge = ecol.replace('1', {'value': 200})
+    edge = ecol.replace_by_key('1', {'value': 200})
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] == 200
 
-    edge = ecol.replace('1', {'value': 300}, sync=True)
+    edge = ecol.replace_by_key('1', {'value': 300}, sync=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] == 300
 
-    edge = ecol.replace('1', {'value': 400}, revision=edge['_rev'])
+    edge = ecol.replace_by_key('1', {'value': 400}, revision=edge['_rev'])
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] == 400
@@ -297,24 +297,24 @@ def test_replace():
     new_rev = str(int(old_rev) + 1)
 
     with pytest.raises(DocumentRevisionError):
-        ecol.replace('1', {'value': 500, '_rev': new_rev})
+        ecol.replace_by_key('1', {'value': 500, '_rev': new_rev})
     assert ecol['1']['value'] == 400
 
     with pytest.raises(DocumentReplaceError):
-        ecol.replace('2', {'value': 600})
+        ecol.replace_by_key('2', {'value': 600})
     assert ecol['1']['value'] == 400
 
 
 def test_delete():
-    ecol.insert_many([edge1, edge2, edge3])
+    ecol.insert_bulk([edge1, edge2, edge3])
 
-    edge = ecol.delete('1')
+    edge = ecol.delete_by_key('1')
     assert edge['id'] == '{}/1'.format(ecol.name)
     assert edge['key'] == '1'
     assert '1' not in ecol
     assert len(ecol) == 2
 
-    edge = ecol.delete('2', sync=True)
+    edge = ecol.delete_by_key('2', sync=True)
     assert edge['id'] == '{}/2'.format(ecol.name)
     assert edge['key'] == '2'
     assert '2' not in ecol
@@ -324,41 +324,41 @@ def test_delete():
     new_rev = str(int(old_rev) + 1)
 
     with pytest.raises(DocumentRevisionError):
-        ecol.delete('3', revision=new_rev)
+        ecol.delete_by_key('3', rev=new_rev)
     assert '3' in ecol
     assert len(ecol) == 1
 
-    assert ecol.delete('4') == False
+    assert ecol.delete_by_key('4') == False
     with pytest.raises(DocumentDeleteError):
-        ecol.delete('4', ignore_missing=False)
+        ecol.delete_by_key('4', ignore_missing=False)
     assert len(ecol) == 1
 
 
 def test_delete_many():
-    result = ecol.delete_many(['1', '2', '3'])
+    result = ecol.delete_by_keys(['1', '2', '3'])
     assert result['removed'] == 0
     assert result['ignored'] == 3
 
-    ecol.insert_many([edge1, edge2, edge3])
-    result = ecol.delete_many([])
+    ecol.insert_bulk([edge1, edge2, edge3])
+    result = ecol.delete_by_keys([])
     assert result['removed'] == 0
     assert result['ignored'] == 0
     for key in ['1', '2', '3']:
         assert key in ecol
 
-    result = ecol.delete_many(['1'])
+    result = ecol.delete_by_keys(['1'])
     assert result['removed'] == 1
     assert result['ignored'] == 0
     assert '1' not in ecol
     assert len(ecol) == 2
 
-    result = ecol.delete_many(['4'])
+    result = ecol.delete_by_keys(['4'])
     assert result['removed'] == 0
     assert result['ignored'] == 1
     assert '2' in ecol and '3' in ecol
     assert len(ecol) == 2
 
-    result = ecol.delete_many(['1', '2', '3'])
+    result = ecol.delete_by_keys(['1', '2', '3'])
     assert result['removed'] == 2
     assert result['ignored'] == 1
     assert len(ecol) == 0
@@ -368,7 +368,7 @@ def test_first():
     assert ecol.first(0) is None
 
     inserted = [edge1, edge2, edge3]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
 
     edge = ecol.first(0)
     assert edge['_key'] == '1'
@@ -403,7 +403,7 @@ def test_last():
     assert ecol.last(0) is None
 
     inserted = [edge3, edge2, edge1]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
 
     edge = ecol.last(0)
     assert edge['_key'] == '1'
@@ -438,7 +438,7 @@ def test_last():
 def test_all():
     assert len(list(ecol.all())) == 0
     inserted = [edge1, edge2, edge3, edge4]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
     # for doc in inserted:
     #     ecol.insert(doc)
     fetched = list(ecol.all())
@@ -464,7 +464,7 @@ def test_all():
 def test_random():
     assert len(list(ecol.all())) == 0
     inserted = [edge1, edge2, edge3, edge4]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
     for attempt in range(10):
         edge = ecol.random()
         assert {
@@ -475,30 +475,30 @@ def test_random():
 
 
 def test_find_one():
-    assert ecol.find({'value': 100}) is None
-    assert ecol.find({}) is None
+    assert ecol.find_one({'value': 100}) is None
+    assert ecol.find_one({}) is None
     inserted = [edge1, edge2, edge3, edge4]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
 
-    assert ecol.find({'_key': '6'}) is None
-    assert ecol.find({'value': 400}) is None
-    assert ecol.find({'foo': 100, 'bar': 200}) is None
-    assert ecol.find({}) is not None
+    assert ecol.find_one({'_key': '6'}) is None
+    assert ecol.find_one({'value': 400}) is None
+    assert ecol.find_one({'foo': 100, 'bar': 200}) is None
+    assert ecol.find_one({}) is not None
 
     for e in [edge1, edge2, edge3]:
-        assert ecol.find({'_to': e['_to']})['_key'] == e['_key']
+        assert ecol.find_one({'_to': e['_to']})['_key'] == e['_key']
     for i in range(1, 5):
-        assert ecol.find({'_key': str(i)})['_key'] == str(i)
+        assert ecol.find_one({'_key': str(i)})['_key'] == str(i)
 
 
 def test_find_many():
-    assert list(ecol.find_many({'value': 100})) == []
+    assert list(ecol.find({'value': 100})) == []
     e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
     e1['value'], e2['value'], e3['value'], e4['value'] = 100, 100, 200, 300
     inserted = [e1, e2, e3, e4]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
 
-    found = list(ecol.find_many({'value': 100}))
+    found = list(ecol.find({'value': 100}))
     assert len(found) == 2
     for edge in found:
         assert edge['_key'] in ['1', '2']
@@ -509,7 +509,7 @@ def test_find_many():
             'value': edge['value']
         } in inserted
 
-    found = list(ecol.find_many({'value': 100}, offset=1))
+    found = list(ecol.find({'value': 100}, offset=1))
     assert len(found) == 1
     for edge in found:
         assert edge['_key'] == '2'
@@ -520,7 +520,7 @@ def test_find_many():
             'value': edge['value']
         } in inserted
 
-    found = list(ecol.find_many({}, limit=4))
+    found = list(ecol.find({}, limit=4))
     assert len(found) == 4
     for edge in found:
         assert edge['_key'] in ['1', '2', '3', '4']
@@ -531,35 +531,35 @@ def test_find_many():
             'value': edge['value']
         } in inserted
 
-    found = list(ecol.find_many({'value': 200}))
+    found = list(ecol.find({'value': 200}))
     assert len(found) == 1
     assert found[0]['_key'] == '3'
 
 
 def test_find_and_update():
-    assert ecol.find_and_update({'value': 100}, {'bar': 100}) == 0
+    assert ecol.update({'value': 100}, {'bar': 100}) == 0
     e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
     e1['value'], e2['value'], e3['value'], e4['value'] = 100, 100, 200, 300
     inserted = [e1, e2, e3, e4]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
 
-    assert ecol.find_and_update({'value': 100}, {'new_value': 200}) == 2
+    assert ecol.update({'value': 100}, {'new_value': 200}) == 2
     for key in ['1', '2']:
         assert ecol[key]['value'] == 100
         assert ecol[key]['new_value'] == 200
 
-    assert ecol.find_and_update({'value': 200}, {'new_value': 100}) == 1
+    assert ecol.update({'value': 200}, {'new_value': 100}) == 1
     assert ecol['3']['value'] == 200
     assert ecol['3']['new_value'] == 100
 
-    assert ecol.find_and_update(
+    assert ecol.update(
         {'value': 300},
         {'value': None},
         sync=True,
         keep_none=True
     ) == 1
     assert ecol['4']['value'] is None
-    assert ecol.find_and_update(
+    assert ecol.update(
         {'value': 200},
         {'value': None},
         sync=True,
@@ -570,22 +570,22 @@ def test_find_and_update():
 
 
 def test_find_and_replace():
-    assert ecol.find_and_replace({'value': 100}, {'bar': 100}) == 0
+    assert ecol.replace({'value': 100}, {'bar': 100}) == 0
     e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
     e1['value'], e2['value'], e3['value'], e4['value'] = 100, 100, 200, 300
     inserted = [e1, e2, e3, e4]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
 
-    assert ecol.find_and_replace({'value': 200}, {'new_value': 100}) == 1
+    assert ecol.replace({'value': 200}, {'new_value': 100}) == 1
     assert 'value' not in ecol['3']
     assert ecol['3']['new_value'] == 100
 
-    assert ecol.find_and_replace({'value': 100}, {'new_value': 400}) == 2
+    assert ecol.replace({'value': 100}, {'new_value': 400}) == 2
     for key in ['1', '2']:
         assert 'value' not in ecol[key]
         assert ecol[key]['new_value'] == 400
 
-    assert ecol.find_and_replace({'value': 500}, {'new_value': 500}) == 0
+    assert ecol.replace({'value': 500}, {'new_value': 500}) == 0
     for key in ['1', '2', '3', '4']:
         assert ecol[key].get('new_value', None) != 500
 
@@ -594,21 +594,21 @@ def test_find_and_replace():
 
 
 def test_find_and_delete():
-    assert ecol.find_and_delete({'value': 100}) == 0
+    assert ecol.delete({'value': 100}) == 0
     e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
     e1['value'], e2['value'], e3['value'], e4['value'] = 100, 100, 200, 300
     inserted = [e1, e2, e3, e4]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
 
     assert '3' in ecol
-    assert ecol.find_and_delete({'value': 200}) == 1
+    assert ecol.delete({'value': 200}) == 1
     assert '3' not in ecol
 
     assert '4' in ecol
-    assert ecol.find_and_delete({'value': 300}, sync=True) == 1
+    assert ecol.delete({'value': 300}, sync=True) == 1
     assert '4' not in ecol
 
-    assert ecol.find_and_delete({'value': 100}, limit=1) == 1
+    assert ecol.delete({'value': 100}, limit=1) == 1
     count = 0
     for key in ['1', '2']:
         if key in ecol:
@@ -624,7 +624,7 @@ def test_find_near():
     e3['coordinates'] = [3, 3]
     e4['coordinates'] = [4, 4]
     inserted = [e1, e4, e2, e3]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
 
     result = ecol.find_near(latitude=1, longitude=1, limit=2)
     assert clean_keys(list(result)) == [e1, e2]
@@ -638,7 +638,7 @@ def test_find_in_range():
     e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
     e1['value'], e2['value'], e3['value'], e4['value'] = 1, 2, 3, 4
     inserted = [e1, e2, e3, e4]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
     result = ecol.find_in_range(
         field='value',
         lower=2,
@@ -658,7 +658,7 @@ def test_find_in_radius():
     e3['coordinates'] = [4, 1]
     e4['coordinates'] = [4, 4]
     inserted = [e1, e2, e3, e4]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
     result = list(ecol.find_in_radius(3, 3, 10, 'distance'))
     for doc in result:
         assert 'distance' in doc
@@ -671,9 +671,9 @@ def test_find_in_square():
     e3['coordinates'] = [5, 1]
     e4['coordinates'] = [5, 5]
     inserted = [e1, e2, e3, e4]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
 
-    result = ecol.find_in_square(
+    result = ecol.find_in_box(
         latitude1=0,
         longitude1=0,
         latitude2=6,
@@ -681,7 +681,7 @@ def test_find_in_square():
     )
     assert clean_keys(list(result)) == [e3, e1]
 
-    result = ecol.find_in_square(
+    result = ecol.find_in_box(
         latitude1=0,
         longitude1=0,
         latitude2=6,
@@ -690,7 +690,7 @@ def test_find_in_square():
     )
     assert clean_keys(list(result)) == [e3]
 
-    result = ecol.find_in_square(
+    result = ecol.find_in_box(
         latitude1=0,
         longitude1=0,
         latitude2=6,
@@ -707,7 +707,7 @@ def test_find_text():
     e2['text'] = 'bar'
     e3['text'] = 'baz'
     inserted = [e1, e2, e3]
-    ecol.insert_many(inserted)
+    ecol.insert_bulk(inserted)
     result = ecol.find_text(
         field='text', query='foo,|bar'
     )

@@ -66,7 +66,7 @@ class Database(object):
         :rtype: dict
         :raises: DatabaseOptionsGetError
         """
-        res = self._conn.get('/_api/database/current')
+        res = self._conn.find_by_key('/_api/database/current')
         if res.status_code not in HTTP_OK:
             raise DatabaseOptionsGetError(res)
         result = res.body['result']
@@ -84,7 +84,7 @@ class Database(object):
         :rtype: dict
         :raises: CollectionListError
         """
-        res = self._conn.get('/_api/collection')
+        res = self._conn.find_by_key('/_api/collection')
         if res.status_code not in HTTP_OK:
             raise CollectionListError(res)
         return {
@@ -187,7 +187,7 @@ class Database(object):
         :rtype: bool
         :raises: CollectionDropError
         """
-        res = self._conn.delete('/_api/collection/{}'.format(name))
+        res = self._conn.delete_by_key('/_api/collection/{}'.format(name))
         if res.status_code not in HTTP_OK:
             if not (res.status_code == 404 and ignore_missing):
                 raise CollectionDropError(res)
@@ -204,7 +204,7 @@ class Database(object):
         :rtype: dict
         :raises: GraphGetError
         """
-        res = self._conn.get('/_api/gharial')
+        res = self._conn.find_by_key('/_api/gharial')
         if res.status_code not in HTTP_OK:
             raise GraphListError(res)
         return [graph['_key'] for graph in res.body['graphs']]
@@ -258,7 +258,7 @@ class Database(object):
         :rtype: bool
         :raises: GraphDropError
         """
-        res = self._conn.delete('/_api/gharial/{}'.format(name))
+        res = self._conn.delete_by_key('/_api/gharial/{}'.format(name))
         if res.status_code not in HTTP_OK:
             if not (res.status_code == 404 and ignore_missing):
                 raise GraphDropError(res)

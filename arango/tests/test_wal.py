@@ -10,7 +10,7 @@ wal = conn.wal
 
 @pytest.mark.order1
 def test_wal_options():
-    options = wal.options()
+    options = wal.properties()
     assert 'oversized_ops' in options
     assert 'log_size' in options
     assert 'historic_logs' in options
@@ -19,7 +19,7 @@ def test_wal_options():
 
 @pytest.mark.order2
 def test_wal_set_options():
-    wal.set_options(
+    wal.set_properties(
         historic_logs=15,
         oversized_ops=False,
         log_size=30000000,
@@ -27,7 +27,7 @@ def test_wal_set_options():
         throttle_limit=1000,
         throttle_wait=16000
     )
-    options = conn.wal.options()
+    options = conn.wal.properties()
     assert options['historic_logs'] == 15
     assert options['oversized_ops'] is False
     assert options['log_size'] == 30000000

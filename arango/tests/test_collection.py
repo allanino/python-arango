@@ -36,7 +36,7 @@ def test_properties():
 
 
 def test_options():
-    options = col.options()
+    options = col.properties()
     assert 'id' in options
     assert options['status'] in COLLECTION_STATUSES.values()
     assert options['name'] == col_name
@@ -55,17 +55,17 @@ def test_options():
 
 
 def test_set_options():
-    options = col.options()
+    options = col.properties()
     old_sync = options['sync']
     old_journal_size = options['journal_size']
 
     new_sync = not old_sync
     new_journal_size = old_journal_size + 1
-    result = col.set_options(
+    result = col.set_properties(
         sync=new_sync, journal_size=new_journal_size
     )
     assert isinstance(result, bool)
-    new_options = col.options()
+    new_options = col.properties()
     assert new_options['sync'] == new_sync
     assert new_options['journal_size'] == new_journal_size
 
@@ -152,14 +152,14 @@ def test_insert():
     assert len(col) == 5
     for key in range(1, 6):
         assert key in col
-        document = col.get(key)
+        document = col.find_by_key(key)
         assert document['_key'] == str(key)
         assert document['foo'] == key * 100
 
     assert '6' not in col
     col.insert({'_key': '6', 'foo': 200}, sync=True)
     assert '6' in col
-    assert col.get('6')['foo'] == 200
+    assert col.find_by_key('6')['foo'] == 200
 
     with pytest.raises(DocumentInsertError):
         col.insert({'_key': '1', 'foo': 300})
@@ -167,7 +167,7 @@ def test_insert():
 
 
 def test_insert_many():
-    result = col.insert_many([
+    result = col.insert_bulk([
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 200},
         {'_key': '3', 'foo': 300},
@@ -180,18 +180,18 @@ def test_insert_many():
     assert len(col) == 5
     for key in range(1, 6):
         assert key in col
-        document = col.get(key)
+        document = col.find_by_key(key)
         assert document['_key'] == str(key)
         assert document['foo'] == key * 100
 
     with pytest.raises(DocumentInsertError):
-        col.insert_many([
+        col.insert_bulk([
             {'_key': '1', 'foo': 100},
             {'_key': '1', 'foo': 200},
             {'_key': '1', 'foo': 300},
         ], halt_on_error=True)
 
-    result = col.insert_many([
+    result = col.insert_bulk([
         {'_key': '1', 'foo': 100},
         {'_key': '1', 'foo': 200},
         {'_key': '1', 'foo': 300},
@@ -200,7 +200,7 @@ def test_insert_many():
     assert result['errors'] == 3
     assert 'details' in result
 
-    result = col.insert_many([
+    result = col.insert_bulk([
         {'_key': '6', 'foo': 100},
         {'_key': '7', 'foo': 200},
         {'_key': '8', 'foo': 300},
@@ -210,21 +210,21 @@ def test_insert_many():
 
 def test_get():
     col.insert({'_key': '1', 'foo': 100})
-    doc = col.get('1')
+    doc = col.find_by_key('1')
     assert doc['foo'] == 100
 
     old_rev = doc['_rev']
     new_rev = str(int(old_rev) + 1)
 
-    assert col.get('2') is None
-    assert col.get('1', revision=old_rev) == doc
+    assert col.find_by_key('2') is None
+    assert col.find_by_key('1', rev=old_rev) == doc
 
     with pytest.raises(DocumentRevisionError):
-        col.get('1', revision=new_rev)
+        col.find_by_key('1', rev=new_rev)
 
 
 def test_get_many():
-    assert col.get_many(['1', '2', '3', '4', '5']) == []
+    assert col.find_by_keys(['1', '2', '3', '4', '5']) == []
     expected = [
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 200},
@@ -232,15 +232,15 @@ def test_get_many():
         {'_key': '4', 'foo': 400},
         {'_key': '5', 'foo': 500},
     ]
-    col.insert_many(expected)
-    assert col.get_many([]) == []
+    col.insert_bulk(expected)
+    assert col.find_by_keys([]) == []
     assert expected == [
         {'_key': doc['_key'], 'foo': doc['foo']}
-        for doc in col.get_many(['1', '2', '3', '4', '5'])
+        for doc in col.find_by_keys(['1', '2', '3', '4', '5'])
         ]
     assert expected == [
         {'_key': doc['_key'], 'foo': doc['foo']}
-        for doc in col.get_many(['1', '2', '3', '4', '5', '6'])
+        for doc in col.find_by_keys(['1', '2', '3', '4', '5', '6'])
         ]
 
 
@@ -248,27 +248,27 @@ def test_update():
     col.insert({'_key': '1', 'foo': 100})
     assert col['1']['foo'] == 100
 
-    doc = col.update('1', {'foo': 200})
+    doc = col.update_by_key('1', {'foo': 200})
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == 200
 
-    doc = col.update('1', {'foo': None}, keep_none=True)
+    doc = col.update_by_key('1', {'foo': None}, keep_none=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] is None
     
-    doc = col.update('1', {'foo': {'bar': 1}}, sync=True)
+    doc = col.update_by_key('1', {'foo': {'bar': 1}}, sync=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == {'bar': 1}
 
-    doc = col.update('1', {'foo': {'baz': 2}}, merge=True)
+    doc = col.update_by_key('1', {'foo': {'baz': 2}}, merge=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == {'bar': 1, 'baz': 2}
 
-    doc = col.update('1', {'foo': None}, keep_none=False)
+    doc = col.update_by_key('1', {'foo': None}, keep_none=False)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert 'foo' not in col['1']
@@ -277,11 +277,11 @@ def test_update():
     new_rev = str(int(old_rev) + 1)
 
     with pytest.raises(DocumentRevisionError):
-        col.update('1', {'foo': 300, '_rev': new_rev})
+        col.update_by_key('1', {'foo': 300, '_rev': new_rev})
     assert 'foo' not in col['1']
 
     with pytest.raises(DocumentUpdateError):
-        col.update('2', {'foo': 300})
+        col.update_by_key('2', {'foo': 300})
     assert 'foo' not in col['1']
 
 
@@ -291,17 +291,17 @@ def test_replace():
     assert doc['_key'] == '1'
     assert col['1']['foo'] == 100
 
-    doc = col.replace('1', {'foo': 200})
+    doc = col.replace_by_key('1', {'foo': 200})
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == 200
 
-    doc = col.replace('1', {'foo': 300}, sync=True)
+    doc = col.replace_by_key('1', {'foo': 300}, sync=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == 300
 
-    doc = col.replace('1', {'foo': 400}, revision=doc['_rev'])
+    doc = col.replace_by_key('1', {'foo': 400}, revision=doc['_rev'])
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == 400
@@ -310,28 +310,28 @@ def test_replace():
     new_rev = str(int(old_rev) + 1)
 
     with pytest.raises(DocumentRevisionError):
-        col.replace('1', {'foo': 500, '_rev': new_rev})
+        col.replace_by_key('1', {'foo': 500, '_rev': new_rev})
     assert col['1']['foo'] == 400
 
     with pytest.raises(DocumentReplaceError):
-        col.replace('2', {'foo': 600})
+        col.replace_by_key('2', {'foo': 600})
     assert col['1']['foo'] == 400
 
 
 def test_delete():
-    col.insert_many([
+    col.insert_bulk([
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 200},
         {'_key': '3', 'foo': 300},
     ])
 
-    doc = col.delete('1')
+    doc = col.delete_by_key('1')
     assert doc['id'] == '{}/1'.format(col.name)
     assert doc['key'] == '1'
     assert '1' not in col
     assert len(col) == 2
 
-    doc = col.delete('2', sync=True)
+    doc = col.delete_by_key('2', sync=True)
     assert doc['id'] == '{}/2'.format(col.name)
     assert doc['key'] == '2'
     assert '2' not in col
@@ -341,45 +341,45 @@ def test_delete():
     new_rev = str(int(old_rev) + 1)
 
     with pytest.raises(DocumentRevisionError):
-        col.delete('3', revision=new_rev)
+        col.delete_by_key('3', rev=new_rev)
     assert '3' in col
     assert len(col) == 1
 
-    assert col.delete('4') == False
+    assert col.delete_by_key('4') == False
     with pytest.raises(DocumentDeleteError):
-        col.delete('4', ignore_missing=False)
+        col.delete_by_key('4', ignore_missing=False)
     assert len(col) == 1
 
 
 def test_delete_many():
-    result = col.delete_many(['1', '2', '3'])
+    result = col.delete_by_keys(['1', '2', '3'])
     assert result['removed'] == 0
     assert result['ignored'] == 3
 
-    col.insert_many([
+    col.insert_bulk([
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 200},
         {'_key': '3', 'foo': 300},
     ])
-    result = col.delete_many([])
+    result = col.delete_by_keys([])
     assert result['removed'] == 0
     assert result['ignored'] == 0
     for key in ['1', '2', '3']:
         assert key in col
 
-    result = col.delete_many(['1'])
+    result = col.delete_by_keys(['1'])
     assert result['removed'] == 1
     assert result['ignored'] == 0
     assert '1' not in col
     assert len(col) == 2
 
-    result = col.delete_many(['4'])
+    result = col.delete_by_keys(['4'])
     assert result['removed'] == 0
     assert result['ignored'] == 1
     assert '2' in col and '3' in col
     assert len(col) == 2
 
-    result = col.delete_many(['1', '2', '3'])
+    result = col.delete_by_keys(['1', '2', '3'])
     assert result['removed'] == 2
     assert result['ignored'] == 1
     assert len(col) == 0
@@ -391,7 +391,7 @@ def test_first():
         {'_key': '2', 'foo': 200},
         {'_key': '3', 'foo': 300},
     ]
-    col.insert_many(inserted)
+    col.insert_bulk(inserted)
     doc = col.first(0)
     assert doc['_key'] == '1'
     assert doc['foo'] == 100
@@ -484,15 +484,15 @@ def test_random():
         {'_key': '4', 'foo': 400},
         {'_key': '5', 'foo': 500},
     ]
-    col.insert_many(inserted)
+    col.insert_bulk(inserted)
     for attempt in range(10):
         doc = col.random()
         assert {'_key': doc['_key'], 'foo': doc['foo']} in inserted
 
 
 def test_find_one():
-    assert col.find({'foo': 100}) is None
-    assert col.find({}) is None
+    assert col.find_one({'foo': 100}) is None
+    assert col.find_one({}) is None
     inserted = [
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 100},
@@ -500,21 +500,21 @@ def test_find_one():
         {'_key': '4', 'foo': 200},
         {'_key': '5', 'foo': 300},
     ]
-    col.insert_many(inserted)
+    col.insert_bulk(inserted)
 
-    assert col.find({'_key': '6'}) is None
-    assert col.find({'foo': 400}) is None
-    assert col.find({'baz': 100}) is None
-    assert col.find({}) is not None
+    assert col.find_one({'_key': '6'}) is None
+    assert col.find_one({'foo': 400}) is None
+    assert col.find_one({'baz': 100}) is None
+    assert col.find_one({}) is not None
 
     for i in [100, 200, 300]:
-        assert col.find({'foo': i})['foo'] == i
+        assert col.find_one({'foo': i})['foo'] == i
     for i in range(1, 6):
-        assert col.find({'_key': str(i)})['_key'] == str(i)
+        assert col.find_one({'_key': str(i)})['_key'] == str(i)
 
 
 def test_find_many():
-    assert list(col.find_many({'foo': 100})) == []
+    assert list(col.find({'foo': 100})) == []
     inserted = [
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 100},
@@ -522,34 +522,34 @@ def test_find_many():
         {'_key': '4', 'foo': 200},
         {'_key': '5', 'foo': 300},
     ]
-    col.insert_many(inserted)
+    col.insert_bulk(inserted)
 
-    found = list(col.find_many({'foo': 100}))
+    found = list(col.find({'foo': 100}))
     assert len(found) == 3
     for doc in found:
         assert doc['_key'] in ['1', '2', '3']
         assert {'_key': doc['_key'], 'foo': doc['foo']} in inserted
 
-    found = list(col.find_many({'foo': 100}, offset=1))
+    found = list(col.find({'foo': 100}, offset=1))
     assert len(found) == 2
     for doc in found:
         assert doc['_key'] in ['1', '2', '3']
         assert {'_key': doc['_key'], 'foo': doc['foo']} in inserted
 
-    found = list(col.find_many({}, limit=4))
+    found = list(col.find({}, limit=4))
     assert len(found) == 4
     for doc in found:
         assert doc['_key'] in ['1', '2', '3', '4', '5']
         assert {'_key': doc['_key'], 'foo': doc['foo']} in inserted
 
-    found = list(col.find_many({'foo': 200}))
+    found = list(col.find({'foo': 200}))
     assert len(found) == 1
     assert found[0]['_key'] == '4'
 
 
 def test_find_and_update():
-    assert col.find_and_update({'foo': 100}, {'bar': 100}) == 0
-    col.insert_many([
+    assert col.update({'foo': 100}, {'bar': 100}) == 0
+    col.insert_bulk([
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 100},
         {'_key': '3', 'foo': 100},
@@ -557,11 +557,11 @@ def test_find_and_update():
         {'_key': '5', 'foo': 300},
     ])
 
-    assert col.find_and_update({'foo': 200}, {'bar': 100}) == 1
+    assert col.update({'foo': 200}, {'bar': 100}) == 1
     assert col['4']['foo'] == 200
     assert col['4']['bar'] == 100
 
-    assert col.find_and_update({'foo': 100}, {'bar': 100}) == 3
+    assert col.update({'foo': 100}, {'bar': 100}) == 3
     for key in ['1', '2', '3']:
         assert col[key]['foo'] == 100
         assert col[key]['bar'] == 100
@@ -569,19 +569,19 @@ def test_find_and_update():
     assert col['5']['foo'] == 300
     assert 'bar' not in col['5']
 
-    assert col.find_and_update(
+    assert col.update(
         {'foo': 300}, {'foo': None}, sync=True, keep_none=True
     ) == 1
     assert col['5']['foo'] is None
-    assert col.find_and_update(
+    assert col.update(
         {'foo': 200}, {'foo': None}, sync=True, keep_none=False
     ) == 1
     assert 'foo' not in col['4']
 
 
 def test_find_and_replace():
-    assert col.find_and_replace({'foo': 100}, {'bar': 100}) == 0
-    col.insert_many([
+    assert col.replace({'foo': 100}, {'bar': 100}) == 0
+    col.insert_bulk([
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 100},
         {'_key': '3', 'foo': 100},
@@ -589,11 +589,11 @@ def test_find_and_replace():
         {'_key': '5', 'foo': 300},
     ])
 
-    assert col.find_and_replace({'foo': 200}, {'bar': 100}) == 1
+    assert col.replace({'foo': 200}, {'bar': 100}) == 1
     assert 'foo' not in col['4']
     assert col['4']['bar'] == 100
 
-    assert col.find_and_replace({'foo': 100}, {'bar': 100}) == 3
+    assert col.replace({'foo': 100}, {'bar': 100}) == 3
     for key in ['1', '2', '3']:
         assert 'foo' not in col[key]
         assert col[key]['bar'] == 100
@@ -603,8 +603,8 @@ def test_find_and_replace():
 
 
 def test_find_and_delete():
-    assert col.find_and_delete({'foo': 100}) == 0
-    col.insert_many([
+    assert col.delete({'foo': 100}) == 0
+    col.insert_bulk([
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 100},
         {'_key': '3', 'foo': 100},
@@ -613,14 +613,14 @@ def test_find_and_delete():
     ])
 
     assert '4' in col
-    assert col.find_and_delete({'foo': 200}) == 1
+    assert col.delete({'foo': 200}) == 1
     assert '4' not in col
 
     assert '5' in col
-    assert col.find_and_delete({'foo': 300}, sync=True) == 1
+    assert col.delete({'foo': 300}, sync=True) == 1
     assert '5' not in col
 
-    assert col.find_and_delete({'foo': 100}, limit=2) == 2
+    assert col.delete({'foo': 100}, limit=2) == 2
     count = 0
     for key in ['1', '2', '3']:
         if key in col:
@@ -630,7 +630,7 @@ def test_find_and_delete():
 
 
 def test_find_near():
-    col.insert_many([
+    col.insert_bulk([
         {'_key': '1', 'coordinates': [1, 1]},
         {'_key': '4', 'coordinates': [4, 4]},
         {'_key': '2', 'coordinates': [2, 2]},
@@ -662,7 +662,7 @@ def test_find_near():
 
 def test_find_in_range():
     col.add_skiplist_index(['value'])
-    col.insert_many([
+    col.insert_bulk([
         {'_key': '1', 'value': 1},
         {'_key': '2', 'value': 2},
         {'_key': '3', 'value': 3},
@@ -685,7 +685,7 @@ def test_find_in_range():
 
 # TODO the WITHIN geo function does not seem to work properly
 def test_find_in_radius():
-    col.insert_many([
+    col.insert_bulk([
         {'_key': '1', 'coordinates': [1, 1]},
         {'_key': '2', 'coordinates': [1, 4]},
         {'_key': '3', 'coordinates': [4, 1]},
@@ -697,13 +697,13 @@ def test_find_in_radius():
 
 
 def test_find_in_rectangle():
-    col.insert_many([
+    col.insert_bulk([
         {'_key': '1', 'coordinates': [1, 1]},
         {'_key': '2', 'coordinates': [1, 5]},
         {'_key': '3', 'coordinates': [5, 1]},
         {'_key': '4', 'coordinates': [5, 5]},
     ])
-    result = col.find_in_square(
+    result = col.find_in_box(
         latitude1=0,
         longitude1=0,
         latitude2=6,
@@ -715,7 +715,7 @@ def test_find_in_rectangle():
     ]
     assert clean_keys(list(result)) == expected
 
-    result = col.find_in_square(
+    result = col.find_in_box(
         latitude1=0,
         longitude1=0,
         latitude2=6,
@@ -727,7 +727,7 @@ def test_find_in_rectangle():
     ]
     assert clean_keys(list(result)) == expected
 
-    result = col.find_in_square(
+    result = col.find_in_box(
         latitude1=0,
         longitude1=0,
         latitude2=6,
@@ -742,7 +742,7 @@ def test_find_in_rectangle():
 
 def test_find_text():
     col.add_fulltext_index(['text'])
-    col.insert_many([
+    col.insert_bulk([
         {'_key': '1', 'text': 'foo'},
         {'_key': '2', 'text': 'bar'},
         {'_key': '3', 'text': 'baz'}
@@ -785,17 +785,6 @@ def test_add_hash_index():
         'type': 'hash',
         'fields': ['attr1', 'attr2'],
         'unique': True
-    }
-    assert expected_index in col.indexes().values()
-
-
-def test_add_cap_constraint():
-    col.add_cap_constraint(size=10, byte_size=40000)
-    expected_index = {
-        'type': 'cap',
-        'size': 10,
-        'byte_size': 40000,
-        'unique': False
     }
     assert expected_index in col.indexes().values()
 

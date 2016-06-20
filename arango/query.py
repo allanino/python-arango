@@ -197,7 +197,7 @@ class QueryCache(object):
         """
         self._conn = connection
 
-    def options(self):
+    def properties(self):
         """Return the configuration of the AQL query cache.
 
         :returns: the result
@@ -212,7 +212,7 @@ class QueryCache(object):
             'limit': res.body['maxResults']
         }
 
-    def set_options(self, mode=None, limit=None):
+    def set_properties(self, mode=None, limit=None):
         """Configure the AQL query cache.
 
         :param mode: the mode to operate in (off/on/demand)
