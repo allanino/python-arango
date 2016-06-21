@@ -20,10 +20,9 @@ class BaseCollection(APIWrapper):
     :param name: the name of the collection
     :type name: str
     """
-    def __init__(self, connection, name, edge=False):
+    def __init__(self, connection, name):
         self._conn = connection
         self._name = name
-        self._type = 'edge' if edge else 'document'
 
     def __iter__(self):
         """Iterate through all documents in the collection.
@@ -61,7 +60,7 @@ class BaseCollection(APIWrapper):
         :rtype: dict
         """
         res = self._conn.get(
-            '/_api/{}/{}/{}'.format(self._type, self._name, key)
+            '/_api/document/{}/{}'.format(self._name, key)
         )
         if res.status_code in {412, 304}:
             raise DocumentRevisionError(res)
@@ -81,27 +80,13 @@ class BaseCollection(APIWrapper):
         :raises: DocumentGetError
         """
         res = self._conn.head(
-            '/_api/{}/{}/{}'.format(self._type, self._name, key)
+            '/_api/document/{}/{}'.format(self._name, key)
         )
         if res.status_code == 200:
             return True
         elif res.status_code == 404:
             return False
         raise DocumentGetError(res)
-
-    def _validate_edge(self, document):
-        """Validate the edge document for correctness.
-
-        :param document: the edge document to validate
-        :type document: dict
-        :raises: ValueError
-        """
-        if self._type == 'edge':
-            if '_from' not in document:
-                raise ValueError("'_from' field is required in the document")
-            if '_to' not in document:
-                raise ValueError("'_to' field is required in the document")
-        return document
 
     @staticmethod
     def _status(code):
@@ -112,7 +97,7 @@ class BaseCollection(APIWrapper):
         :returns: the status text
         :rtype: str
         """
-        return COLLECTION_STATUSES.find_by_key(
+        return COLLECTION_STATUSES.get(
             code, 'corrupted ({})'.format(code)
         )
 
@@ -390,7 +375,7 @@ class BaseCollection(APIWrapper):
         """
         request = Request(
             method='head',
-            endpoint='/_api/{}/{}/{}'.format(self._type, self._name, key),
+            endpoint='/_api/document/{}/{}'.format(self._name, key),
         )
 
         def handler(res):
@@ -956,11 +941,11 @@ class Collection(BaseCollection):
     :type name: str
     """
 
-    def __init__(self, connection, name, edge=False):
-        super(Collection, self).__init__(connection, name, edge)
+    def __init__(self, connection, name):
+        super(Collection, self).__init__(connection, name)
 
     def __repr__(self):
-        return "<ArangoDB {} collection '{}'>".format(self._type, self._name)
+        return "<ArangoDB collection '{}'>".format(self._name)
 
     @property
     def name(self):
@@ -1031,7 +1016,7 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def find_by_key(self, key, rev=None, match=True):
+    def get(self, key, rev=None, match=True):
         """Return the document with the specified key.
 
         If ``revision`` is specified, it is compared against the revision of
@@ -1051,7 +1036,7 @@ class Collection(BaseCollection):
         """
         request = Request(
             method='get',
-            endpoint='/_api/{}/{}/{}'.format(self._type, self._name, key),
+            endpoint='/_api/document/{}/{}'.format(self._name, key),
             headers={
                 'If-Match' if match else 'If-None-Match': rev
             } if rev else {}
@@ -1068,7 +1053,7 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def find_by_keys(self, keys):
+    def gets(self, keys):
         """Return all documents whose key is in ``keys``.
 
         :param keys: the document keys
@@ -1107,17 +1092,13 @@ class Collection(BaseCollection):
             DocumentInvalidError,
             CollectionNotFoundError
         """
-        self._validate_edge(document)
         params = {'collection': self._name}
         if sync is not None:
             params['waitForSync'] = sync
-        if self._type == 'edge':
-            params['from'] = document['_from']
-            params['to'] = document['_to']
 
         request = Request(
             method='post',
-            endpoint='/_api/{}'.format(self._type),
+            endpoint='/_api/document',
             data=document,
             params=params
         )
@@ -1152,10 +1133,7 @@ class Collection(BaseCollection):
         request = Request(
             method='post',
             endpoint='/_api/import',
-            data='\r\n'.join([
-                json.dumps(self._validate_edge(doc))
-                for doc in documents
-            ]),
+            data='\r\n'.join([json.dumps(d) for d in documents]),
             params={
                 'type': 'documents',
                 'collection': self._name,
@@ -1249,9 +1227,7 @@ class Collection(BaseCollection):
 
         request = Request(
             method='patch',
-            endpoint='/_api/{}/{}/{}'.format(
-                self._type, self._name, key
-            ),
+            endpoint='/_api/document/{}/{}'.format(self._name, key),
             data=data,
             params=params
         )
@@ -1334,7 +1310,7 @@ class Collection(BaseCollection):
 
         request = Request(
             method='put',
-            endpoint='/_api/{}/{}/{}'.format(self._type, self._name, key),
+            endpoint='/_api/document/{}/{}'.format(self._name, key),
             params=params,
             data=data
         )
@@ -1381,7 +1357,7 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def delete_by_key(self, key, rev=None, sync=False, ignore_missing=True):
+    def delete(self, key, rev=None, sync=False, ignore_missing=True):
         """Delete the specified document from the collection.
 
         :param key: the key of the document to be deleted
@@ -1402,9 +1378,7 @@ class Collection(BaseCollection):
             params['policy'] = 'error'
         request = Request(
             method='delete',
-            endpoint='/_api/{}/{}/{}'.format(
-                self._type, self._name, key
-            ),
+            endpoint='/_api/document/{}/{}'.format(self._name, key),
             params=params
         )
 
@@ -1426,7 +1400,7 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def delete_by_keys(self, keys, sync=None):
+    def deletes(self, keys, sync=None):
         """Remove all documents with the given keys.
 
         :param keys: keys of documents to delete

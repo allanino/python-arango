@@ -32,7 +32,7 @@ class Connection(object):
     :type client: arango.clients.base.BaseHTTPClient | None
     """
 
-    def __init__(self, protocol='http', host='localhost', port=8529,
+    def __init__(self, protocol='http', host='localhost', port=9000,
                  username='root', password='', verify=True, client=None):
         self.protocol = protocol
         self.host = host
@@ -346,7 +346,7 @@ class Connection(object):
         :raises: ShutdownError
         """
         try:
-            res = self.get('/_admin/shutdown')
+            res = self.delete('/_admin/shutdown')
         except ConnectionError:
             return False
         else:

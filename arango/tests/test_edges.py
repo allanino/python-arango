@@ -154,7 +154,7 @@ def test_insert():
     assert '1' in ecol
     assert len(ecol) == 1
 
-    edge = ecol.find_by_key('1')
+    edge = ecol.get('1')
     assert edge['_key'] == '1'
     assert edge['_from'] == edge1['_from']
     assert edge['_to'] == edge1['_to']
@@ -165,7 +165,7 @@ def test_insert():
     assert '2' in ecol
     assert len(ecol) == 2
 
-    edge = ecol.find_by_key('2')
+    edge = ecol.get('2')
     assert edge['_key'] == '2'
     assert edge['_from'] == edge2['_from']
     assert edge['_to'] == edge2['_to']
@@ -185,7 +185,7 @@ def test_insert_many():
     assert len(ecol) == 3
     for key in range(1, 4):
         assert key in ecol
-        edge = ecol.find_by_key(key)
+        edge = ecol.get(key)
         assert edge['_key'] == str(key)
 
     with pytest.raises(DocumentInsertError):
@@ -204,32 +204,32 @@ def test_insert_many():
 
 def test_get():
     ecol.insert(edge1)
-    edge = ecol.find_by_key('1')
+    edge = ecol.get('1')
     assert edge['_key'] == '1'
     assert edge['_from'] == edge1['_from']
     assert edge['_to'] == edge1['_to']
-    assert ecol.find_by_key('2') is None
+    assert ecol.get('2') is None
 
     old_rev = edge['_rev']
     new_rev = str(int(old_rev) + 1)
-    assert ecol.find_by_key('1', rev=old_rev) == edge
+    assert ecol.get('1', rev=old_rev) == edge
 
     with pytest.raises(DocumentRevisionError):
-        ecol.find_by_key('1', rev=new_rev)
+        ecol.get('1', rev=new_rev)
 
 
 def test_get_many():
-    assert ecol.find_by_keys(['1', '2', '3', '4', '5']) == []
+    assert ecol.gets(['1', '2', '3', '4', '5']) == []
     expected = [edge1, edge2, edge3, edge4]
     ecol.insert_bulk(expected)
-    assert ecol.find_by_keys([]) == []
+    assert ecol.gets([]) == []
     assert expected == [
         {'_key': edge['_key'], '_from': edge['_from'], '_to': edge['_to']}
-        for edge in ecol.find_by_keys(['1', '2', '3', '4'])
+        for edge in ecol.gets(['1', '2', '3', '4'])
     ]
     assert expected == [
         {'_key': edge['_key'], '_from': edge['_from'], '_to': edge['_to']}
-        for edge in ecol.find_by_keys(['1', '2', '3', '4', '5', '6'])
+        for edge in ecol.gets(['1', '2', '3', '4', '5', '6'])
     ]
 
 
@@ -308,13 +308,13 @@ def test_replace():
 def test_delete():
     ecol.insert_bulk([edge1, edge2, edge3])
 
-    edge = ecol.delete_by_key('1')
+    edge = ecol.delete('1')
     assert edge['id'] == '{}/1'.format(ecol.name)
     assert edge['key'] == '1'
     assert '1' not in ecol
     assert len(ecol) == 2
 
-    edge = ecol.delete_by_key('2', sync=True)
+    edge = ecol.delete('2', sync=True)
     assert edge['id'] == '{}/2'.format(ecol.name)
     assert edge['key'] == '2'
     assert '2' not in ecol
@@ -324,41 +324,41 @@ def test_delete():
     new_rev = str(int(old_rev) + 1)
 
     with pytest.raises(DocumentRevisionError):
-        ecol.delete_by_key('3', rev=new_rev)
+        ecol.delete('3', rev=new_rev)
     assert '3' in ecol
     assert len(ecol) == 1
 
-    assert ecol.delete_by_key('4') == False
+    assert ecol.delete('4') == False
     with pytest.raises(DocumentDeleteError):
-        ecol.delete_by_key('4', ignore_missing=False)
+        ecol.delete('4', ignore_missing=False)
     assert len(ecol) == 1
 
 
 def test_delete_many():
-    result = ecol.delete_by_keys(['1', '2', '3'])
+    result = ecol.deletes(['1', '2', '3'])
     assert result['removed'] == 0
     assert result['ignored'] == 3
 
     ecol.insert_bulk([edge1, edge2, edge3])
-    result = ecol.delete_by_keys([])
+    result = ecol.deletes([])
     assert result['removed'] == 0
     assert result['ignored'] == 0
     for key in ['1', '2', '3']:
         assert key in ecol
 
-    result = ecol.delete_by_keys(['1'])
+    result = ecol.deletes(['1'])
     assert result['removed'] == 1
     assert result['ignored'] == 0
     assert '1' not in ecol
     assert len(ecol) == 2
 
-    result = ecol.delete_by_keys(['4'])
+    result = ecol.deletes(['4'])
     assert result['removed'] == 0
     assert result['ignored'] == 1
     assert '2' in ecol and '3' in ecol
     assert len(ecol) == 2
 
-    result = ecol.delete_by_keys(['1', '2', '3'])
+    result = ecol.deletes(['1', '2', '3'])
     assert result['removed'] == 2
     assert result['ignored'] == 1
     assert len(ecol) == 0

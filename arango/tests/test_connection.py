@@ -126,7 +126,6 @@ def test_endpoints():
     endpoints = conn.endpoints()
     assert isinstance(endpoints, list)
     for endpoint in endpoints:
-        assert 'databases' in endpoint
         assert 'endpoint' in endpoint
 
 

@@ -70,7 +70,6 @@ def test_query_validate():
     assert 'bindVars' in result
     assert 'collections' in result
     assert 'parsed' in result
-    assert 'warnings'in result
 
 
 @pytest.mark.order3

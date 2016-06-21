@@ -66,7 +66,7 @@ class Database(object):
         :rtype: dict
         :raises: DatabaseOptionsGetError
         """
-        res = self._conn.find_by_key('/_api/database/current')
+        res = self._conn.get('/_api/database/current')
         if res.status_code not in HTTP_OK:
             raise DatabaseOptionsGetError(res)
         result = res.body['result']
@@ -84,7 +84,7 @@ class Database(object):
         :rtype: dict
         :raises: CollectionListError
         """
-        res = self._conn.find_by_key('/_api/collection')
+        res = self._conn.get('/_api/collection')
         if res.status_code not in HTTP_OK:
             raise CollectionListError(res)
         return {
@@ -94,21 +94,19 @@ class Database(object):
                 'type': COLLECTION_TYPES[col['type']],
                 'status': COLLECTION_STATUSES[col['status']],
             }
-            for col in res.body['collections']
+            for col in res.body['result']
         }
 
-    def collection(self, name, edge=False):
+    def collection(self, name):
         """Return the Collection object of the specified name.
 
         :param name: the name of the collection
         :type name: str
-        :param edge: whether this collection is an edge collection
-        :type edge: bool
         :returns: the requested collection object
         :rtype: arango.collection.Collection
         :raises: TypeError
         """
-        return Collection(self._conn, name, edge)
+        return Collection(self._conn, name)
 
     def create_collection(self, name, sync=False, compact=True, system=False,
                           journal_size=None, edge=False, volatile=False,
@@ -174,7 +172,7 @@ class Database(object):
         res = self._conn.post('/_api/collection', data=data)
         if res.status_code not in HTTP_OK:
             raise CollectionCreateError(res)
-        return self.collection(name, edge)
+        return self.collection(name)
 
     def drop_collection(self, name, ignore_missing=False):
         """Drop the specified collection from this database.
@@ -187,7 +185,7 @@ class Database(object):
         :rtype: bool
         :raises: CollectionDropError
         """
-        res = self._conn.delete_by_key('/_api/collection/{}'.format(name))
+        res = self._conn.delete('/_api/collection/{}'.format(name))
         if res.status_code not in HTTP_OK:
             if not (res.status_code == 404 and ignore_missing):
                 raise CollectionDropError(res)
@@ -204,7 +202,7 @@ class Database(object):
         :rtype: dict
         :raises: GraphGetError
         """
-        res = self._conn.find_by_key('/_api/gharial')
+        res = self._conn.get('/_api/gharial')
         if res.status_code not in HTTP_OK:
             raise GraphListError(res)
         return [graph['_key'] for graph in res.body['graphs']]
@@ -258,7 +256,7 @@ class Database(object):
         :rtype: bool
         :raises: GraphDropError
         """
-        res = self._conn.delete_by_key('/_api/gharial/{}'.format(name))
+        res = self._conn.delete('/_api/gharial/{}'.format(name))
         if res.status_code not in HTTP_OK:
             if not (res.status_code == 404 and ignore_missing):
                 raise GraphDropError(res)

@@ -152,14 +152,14 @@ def test_insert():
     assert len(col) == 5
     for key in range(1, 6):
         assert key in col
-        document = col.find_by_key(key)
+        document = col.get(key)
         assert document['_key'] == str(key)
         assert document['foo'] == key * 100
 
     assert '6' not in col
     col.insert({'_key': '6', 'foo': 200}, sync=True)
     assert '6' in col
-    assert col.find_by_key('6')['foo'] == 200
+    assert col.get('6')['foo'] == 200
 
     with pytest.raises(DocumentInsertError):
         col.insert({'_key': '1', 'foo': 300})
@@ -180,7 +180,7 @@ def test_insert_many():
     assert len(col) == 5
     for key in range(1, 6):
         assert key in col
-        document = col.find_by_key(key)
+        document = col.get(key)
         assert document['_key'] == str(key)
         assert document['foo'] == key * 100
 
@@ -210,21 +210,21 @@ def test_insert_many():
 
 def test_get():
     col.insert({'_key': '1', 'foo': 100})
-    doc = col.find_by_key('1')
+    doc = col.get('1')
     assert doc['foo'] == 100
 
     old_rev = doc['_rev']
     new_rev = str(int(old_rev) + 1)
 
-    assert col.find_by_key('2') is None
-    assert col.find_by_key('1', rev=old_rev) == doc
+    assert col.get('2') is None
+    assert col.get('1', rev=old_rev) == doc
 
     with pytest.raises(DocumentRevisionError):
-        col.find_by_key('1', rev=new_rev)
+        col.get('1', rev=new_rev)
 
 
 def test_get_many():
-    assert col.find_by_keys(['1', '2', '3', '4', '5']) == []
+    assert col.gets(['1', '2', '3', '4', '5']) == []
     expected = [
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 200},
@@ -233,14 +233,14 @@ def test_get_many():
         {'_key': '5', 'foo': 500},
     ]
     col.insert_bulk(expected)
-    assert col.find_by_keys([]) == []
+    assert col.gets([]) == []
     assert expected == [
         {'_key': doc['_key'], 'foo': doc['foo']}
-        for doc in col.find_by_keys(['1', '2', '3', '4', '5'])
+        for doc in col.gets(['1', '2', '3', '4', '5'])
         ]
     assert expected == [
         {'_key': doc['_key'], 'foo': doc['foo']}
-        for doc in col.find_by_keys(['1', '2', '3', '4', '5', '6'])
+        for doc in col.gets(['1', '2', '3', '4', '5', '6'])
         ]
 
 
@@ -325,13 +325,13 @@ def test_delete():
         {'_key': '3', 'foo': 300},
     ])
 
-    doc = col.delete_by_key('1')
+    doc = col.delete('1')
     assert doc['id'] == '{}/1'.format(col.name)
     assert doc['key'] == '1'
     assert '1' not in col
     assert len(col) == 2
 
-    doc = col.delete_by_key('2', sync=True)
+    doc = col.delete('2', sync=True)
     assert doc['id'] == '{}/2'.format(col.name)
     assert doc['key'] == '2'
     assert '2' not in col
@@ -341,18 +341,18 @@ def test_delete():
     new_rev = str(int(old_rev) + 1)
 
     with pytest.raises(DocumentRevisionError):
-        col.delete_by_key('3', rev=new_rev)
+        col.delete('3', rev=new_rev)
     assert '3' in col
     assert len(col) == 1
 
-    assert col.delete_by_key('4') == False
+    assert col.delete('4') == False
     with pytest.raises(DocumentDeleteError):
-        col.delete_by_key('4', ignore_missing=False)
+        col.delete('4', ignore_missing=False)
     assert len(col) == 1
 
 
 def test_delete_many():
-    result = col.delete_by_keys(['1', '2', '3'])
+    result = col.deletes(['1', '2', '3'])
     assert result['removed'] == 0
     assert result['ignored'] == 3
 
@@ -361,91 +361,28 @@ def test_delete_many():
         {'_key': '2', 'foo': 200},
         {'_key': '3', 'foo': 300},
     ])
-    result = col.delete_by_keys([])
+    result = col.deletes([])
     assert result['removed'] == 0
     assert result['ignored'] == 0
     for key in ['1', '2', '3']:
         assert key in col
 
-    result = col.delete_by_keys(['1'])
+    result = col.deletes(['1'])
     assert result['removed'] == 1
     assert result['ignored'] == 0
     assert '1' not in col
     assert len(col) == 2
 
-    result = col.delete_by_keys(['4'])
+    result = col.deletes(['4'])
     assert result['removed'] == 0
     assert result['ignored'] == 1
     assert '2' in col and '3' in col
     assert len(col) == 2
 
-    result = col.delete_by_keys(['1', '2', '3'])
+    result = col.deletes(['1', '2', '3'])
     assert result['removed'] == 2
     assert result['ignored'] == 1
     assert len(col) == 0
-
-
-def test_first():
-    inserted = [
-        {'_key': '1', 'foo': 100},
-        {'_key': '2', 'foo': 200},
-        {'_key': '3', 'foo': 300},
-    ]
-    col.insert_bulk(inserted)
-    doc = col.first(0)
-    assert doc['_key'] == '1'
-    assert doc['foo'] == 100
-
-    docs = col.first(1)
-    assert len(docs) == 1
-    assert docs[0]['_key'] == '1'
-    assert docs[0]['foo'] == 100
-
-    docs = col.first(2)
-    assert len(docs) == 2
-    assert docs[0]['_key'] == '1'
-    assert docs[0]['foo'] == 100
-    assert docs[1]['_key'] == '2'
-    assert docs[1]['foo'] == 200
-
-    docs = col.first(10)
-    assert len(docs) == 3
-    for doc in [{'_key': doc['_key'], 'foo': doc['foo']} for doc in docs]:
-        assert doc in inserted
-    with pytest.raises(DocumentGetFirstError):
-        assert col.first(-1)
-
-
-def test_last():
-    inserted = [
-        {'_key': '3', 'foo': 300},
-        {'_key': '2', 'foo': 200},
-        {'_key': '1', 'foo': 100},
-    ]
-    for doc in inserted:
-        col.insert(doc)
-    doc = col.last(0)
-    assert doc['_key'] == '1'
-    assert doc['foo'] == 100
-
-    docs = col.last(1)
-    assert len(docs) == 1
-    assert docs[0]['_key'] == '1'
-    assert docs[0]['foo'] == 100
-
-    docs = col.last(2)
-    assert len(docs) == 2
-    assert docs[0]['_key'] == '1'
-    assert docs[0]['foo'] == 100
-    assert docs[1]['_key'] == '2'
-    assert docs[1]['foo'] == 200
-
-    docs = col.last(10)
-    assert len(docs) == 3
-    for doc in [{'_key': doc['_key'], 'foo': doc['foo']} for doc in docs]:
-        assert doc in inserted
-    with pytest.raises(DocumentGetLastError):
-        assert col.last(-1)
 
 
 def test_all():

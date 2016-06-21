@@ -20,10 +20,8 @@ class Job(object):
 
     def result(self):
         """Get the result of the job from the server."""
-        res = self._conn.find_by_key('/_api/job/{}'.format(self._id))
+        res = self._conn.get('/_api/job/{}'.format(self._id))
         if res.status_code == 200:
-            print(res.text)
-            print(res.body)
             return self._handler(res)
         elif res.status_code == 400:
             raise JobInvalidError(res)
@@ -48,7 +46,7 @@ class Job(object):
 
     def delete(self):
         """Delete the result of the job from the server."""
-        res = self._conn.delete_by_key('/_api/job/{}'.format(self._id))
+        res = self._conn.delete('/_api/job/{}'.format(self._id))
         if res.status_code == 200:
             return True
         elif res.status_code == 400:

@@ -412,7 +412,7 @@ class VertexCollection(BaseCollection):
 
         return request, handler
 
-    def find_by_key(self, key, rev=None):
+    def get(self, key, rev=None):
         """Return the vertex with specified key from the vertex collection.
 
         If ``revision`` is specified, its value must match against the
@@ -548,7 +548,7 @@ class VertexCollection(BaseCollection):
 
         return request, handler
 
-    def delete_by_key(self, key, rev=None, sync=False, ignore_missing=True):
+    def delete(self, key, rev=None, sync=False, ignore_missing=True):
         """Delete the vertex of the specified ID from the graph.
 
         :param key: the vertex key
@@ -650,7 +650,7 @@ class EdgeCollection(BaseCollection):
 
         return request, handler
 
-    def find_by_key(self, key, rev=None):
+    def get(self, key, rev=None):
         """Return the edge of the specified ID in the graph.
 
         If the edge revision ``rev`` is specified, it must match against
@@ -787,7 +787,7 @@ class EdgeCollection(BaseCollection):
 
         return request, handler
 
-    def delete_by_key(self, key, rev=None, sync=False, ignore_missing=True):
+    def delete(self, key, rev=None, sync=False, ignore_missing=True):
         """Delete the edge of the specified ID from the graph.
 
         :param key: the key of the edge to be deleted
