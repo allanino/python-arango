@@ -2,7 +2,7 @@ from __future__ import absolute_import, unicode_literals
 
 import pytest
 
-from arango import Connection
+from arango import ArangoClient
 from arango.exceptions import *
 from arango.tests.utils import (
     generate_db_name,
@@ -10,10 +10,10 @@ from arango.tests.utils import (
 )
 
 
-conn = Connection()
+arango_client = ArangoClient()
 
-db_name = generate_db_name(conn)
-db = conn.create_database(db_name)
+db_name = generate_db_name(arango_client)
+db = arango_client.create_database(db_name)
 col_name = generate_col_name(db)
 db.create_collection(col_name)
 func_name = ''
@@ -21,7 +21,7 @@ func_body = ''
 
 
 def teardown_module(*_):
-    conn.drop_database(db_name, ignore_missing=True)
+    arango_client.drop_database(db_name, ignore_missing=True)
 
 
 @pytest.mark.order1
@@ -79,7 +79,7 @@ def test_query_execute():
         db.query.execute('THIS IS AN INVALID QUERY')
 
     # Test valid AQL query #1
-    db.collection(col_name).insert_bulk([
+    db.collection(col_name).insert_many([
         {"_key": "doc01"},
         {"_key": "doc02"},
         {"_key": "doc03"},
@@ -94,14 +94,15 @@ def test_query_execute():
     assert set(d['_key'] for d in result) == {'doc01', 'doc02', 'doc03'}
 
     # Test valid AQL query #2
-    db.collection(col_name).insert_bulk([
+    db.collection(col_name).insert_many([
         {"_key": "doc04", "value": 1},
         {"_key": "doc05", "value": 1},
         {"_key": "doc06", "value": 3},
     ])
     result = db.query.execute(
         "FOR d IN {} FILTER d.value == @value RETURN d".format(col_name),
-        bind_vars={'value': 1}
+        bind_vars={'value': 1},
+        count=True
     )
     assert set(d['_key'] for d in result) == {'doc04', 'doc05'}
 

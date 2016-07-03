@@ -2,7 +2,7 @@ from __future__ import absolute_import, unicode_literals
 
 import pytest
 
-from arango.connection import Connection
+from arango import ArangoClient
 from arango.exceptions import *
 from arango.tests.utils import (
     generate_db_name,
@@ -11,9 +11,9 @@ from arango.tests.utils import (
     clean_keys
 )
 
-conn = Connection()
-db_name = generate_db_name(conn)
-db = conn.create_database(db_name)
+arango_client = ArangoClient()
+db_name = generate_db_name(arango_client)
+db = arango_client.create_database(db_name)
 col_name = generate_col_name(db)
 col = db.create_collection(col_name)
 graph_name = generate_graph_name(db)
@@ -21,7 +21,7 @@ graph = db.create_graph(graph_name)
 
 
 def teardown_module(*_):
-    conn.drop_database(db_name, ignore_missing=True)
+    arango_client.drop_database(db_name, ignore_missing=True)
 
 
 def setup_function(*_):
@@ -327,10 +327,10 @@ def test_get_vertex():
 def test_update_vertex():
     vcol = graph.vertex_collection('vcol1')
     assert 'foo' not in vcol.get('1')
-    assert vcol.update_by_key('1', {'foo': 100})
+    assert vcol.update('1', {'foo': 100})
     assert vcol.get('1')['foo'] == 100
 
-    result = vcol.update_by_key('1', {'foo': 200, 'bar': 300})
+    result = vcol.update('1', {'foo': 200, 'bar': 300})
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result
     assert '_rev' in result
@@ -340,7 +340,7 @@ def test_update_vertex():
     assert result['bar'] == 300
     old_rev = result['_rev']
 
-    result = vcol.update_by_key('1', {'bar': 500}, rev=old_rev)
+    result = vcol.update('1', {'bar': 500}, rev=old_rev)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result
     assert '_rev' in result
@@ -349,21 +349,21 @@ def test_update_vertex():
 
     new_rev = str(int(old_rev) + 10)
     with pytest.raises(VertexRevisionError):
-        vcol.update_by_key('1', {'bar': 600}, rev=new_rev)
+        vcol.update('1', {'bar': 600}, rev=new_rev)
     assert vcol.get('1')['bar'] == 500
 
-    result = vcol.update_by_key('1', {'bar': 400}, sync=True)
+    result = vcol.update('1', {'bar': 400}, sync=True)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
     assert vcol.get('1')['foo'] == 200
     assert vcol.get('1')['bar'] == 400
 
-    result = vcol.update_by_key('1', {'bar': None}, keep_none=True)
+    result = vcol.update('1', {'bar': None}, keep_none=True)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
     assert vcol.get('1')['bar'] is None
 
-    result = vcol.update_by_key('1', {'foo': None}, keep_none=False)
+    result = vcol.update('1', {'foo': None}, keep_none=False)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
     assert vcol.get('1')['bar'] is None
@@ -378,15 +378,14 @@ def test_replace_vertex():
     assert 'bar' in vcol.get('1')
     assert 'value' in vcol.get('1')
 
-    #
-    result = vcol.replace_by_key('1', {'baz': 100})
+    result = vcol.replace('1', {'baz': 100})
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
     assert vcol.get('1')['baz'] == 100
     assert 'bar' not in vcol.get('1')
     assert 'value' not in vcol.get('1')
 
-    result = vcol.replace_by_key('1', {'foo': 200, 'bar': 300})
+    result = vcol.replace('1', {'foo': 200, 'bar': 300})
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
 
@@ -394,7 +393,7 @@ def test_replace_vertex():
     assert clean_keys(result) == {'_key': '1', 'foo': 200, 'bar': 300}
     old_rev = result['_rev']
 
-    result = vcol.replace_by_key('1', {'bar': 500}, rev=old_rev)
+    result = vcol.replace('1', {'bar': 500}, rev=old_rev)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
     assert vcol.get('1')['bar'] == 500
@@ -402,11 +401,11 @@ def test_replace_vertex():
 
     new_rev = str(int(old_rev) + 10)
     with pytest.raises(VertexRevisionError):
-        vcol.replace_by_key('1', {'bar': 600}, rev=new_rev)
+        vcol.replace('1', {'bar': 600}, rev=new_rev)
     assert vcol.get('1')['bar'] == 500
     assert 'foo' not in vcol.get('1')
 
-    result = vcol.replace_by_key('1', {'bar': 400, 'foo': 200}, sync=True)
+    result = vcol.replace('1', {'bar': 400, 'foo': 200}, sync=True)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
     assert vcol.get('1')['foo'] == 200
@@ -449,7 +448,7 @@ def test_delete_vertex():
 
 @pytest.mark.order15
 def test_insert_edge():
-    ecol = db.collection('ecol2', edge=True)
+    ecol = db.collection('ecol2')
     ecol.truncate()
 
 

@@ -6,7 +6,7 @@ from datetime import datetime
 import pytest
 from six import string_types
 
-from arango.connection import Connection
+from arango import ArangoClient
 from arango.database import Database
 from arango.exceptions import *
 from arango.tests.utils import (
@@ -15,58 +15,58 @@ from arango.tests.utils import (
     generate_task_name
 )
 
-conn = Connection()
-db_name = generate_db_name(conn)
-username = generate_user_name(conn)
-task_name = generate_task_name(conn)
+arango_client = ArangoClient()
+db_name = generate_db_name(arango_client)
+username = generate_user_name(arango_client)
+task_name = generate_task_name(arango_client)
 task_id = ''
 
 
 def teardown_module(*_):
-    conn.drop_database(db_name, ignore_missing=True)
-    conn.delete_user(username, ignore_missing=True)
+    arango_client.drop_database(db_name, ignore_missing=True)
+    arango_client.delete_user(username, ignore_missing=True)
     if task_id:
-        conn.delete_task(task_id, ignore_missing=True)
+        arango_client.delete_task(task_id, ignore_missing=True)
 
 
 def test_properties():
-    assert conn.protocol == 'http'
-    assert conn.host == 'localhost'
-    assert conn.port == 8529
-    assert 'ArangoDB connection at' in repr(conn)
+    assert arango_client._protocol == 'http'
+    assert arango_client._host == 'localhost'
+    assert arango_client._port == 8529
+    assert 'ArangoDB client pointing to' in repr(arango_client)
 
 
 def test_version():
-    version = conn.version()
+    version = arango_client.version()
     assert isinstance(version, string_types)
 
 
 def test_details():
-    details = conn.details()
+    details = arango_client.details()
     assert 'architecture' in details
     assert 'server-version' in details
 
 
 def test_required_db_version():
-    version = conn.required_db_version()
+    version = arango_client.required_db_version()
     assert isinstance(version, string_types)
 
 
 def test_statistics():
-    statistics = conn.statistics(description=False)
+    statistics = arango_client.statistics(description=False)
     assert isinstance(statistics, dict)
     assert 'time' in statistics
     assert 'system' in statistics
     assert 'server' in statistics
 
-    description = conn.statistics(description=True)
+    description = arango_client.statistics(description=True)
     assert isinstance(description, dict)
     assert 'figures' in description
     assert 'groups' in description
 
 
 def test_role():
-    assert conn.role() in {
+    assert arango_client.role() in {
         'SINGLE',
         'COORDINATOR',
         'PRIMARY',
@@ -76,12 +76,12 @@ def test_role():
 
 
 def test_time():
-    system_time = conn.time()
+    system_time = arango_client.time()
     assert isinstance(system_time, datetime)
 
 
 def test_echo():
-    last_request = conn.echo()
+    last_request = arango_client.echo()
     assert 'protocol' in last_request
     assert 'user' in last_request
     assert 'requestType' in last_request
@@ -89,7 +89,7 @@ def test_echo():
 
 
 def test_sleep():
-    assert conn.sleep(2) == 2
+    assert arango_client.sleep(2) == 2
 
 
 # def test_shutdown():
@@ -101,16 +101,16 @@ def test_sleep():
 
 
 def test_execute():
-    assert conn.execute('return 1') == '1'
-    assert conn.execute('return "test"') == '"test"'
+    assert arango_client.execute('return 1') == '1'
+    assert arango_client.execute('return "test"') == '"test"'
     with pytest.raises(ProgramExecuteError) as err:
-        conn.execute('return invalid')
+        arango_client.execute('return invalid')
     assert err.value.message == 'Internal Server Error'
 
 
 # TODO test parameters
 def test_log():
-    log = conn.read_log()
+    log = arango_client.read_log()
     assert 'lid' in log
     assert 'level' in log
     assert 'text' in log
@@ -118,12 +118,12 @@ def test_log():
 
 
 def test_reload_routing():
-    result = conn.reload_routing()
+    result = arango_client.reload_routing()
     assert isinstance(result, bool)
 
 
 def test_endpoints():
-    endpoints = conn.endpoints()
+    endpoints = arango_client.endpoints()
     assert isinstance(endpoints, list)
     for endpoint in endpoints:
         assert 'endpoint' in endpoint
@@ -132,47 +132,47 @@ def test_endpoints():
 def test_database_management():
     # Test list databases
     # TODO something wrong here
-    result = conn.databases()
+    result = arango_client.databases()
     assert '_system' in result
 
-    result = conn.databases(user_only=True)
+    result = arango_client.databases(user_only=True)
     assert '_system' in result
 
-    assert db_name not in conn.databases()
+    assert db_name not in arango_client.databases()
 
     # Test create database
-    result = conn.create_database(db_name)
+    result = arango_client.create_database(db_name)
     assert isinstance(result, Database)
-    assert db_name in conn.databases()
+    assert db_name in arango_client.databases()
 
     # Test get after create database
-    assert isinstance(conn.db(db_name), Database)
-    assert conn.db(db_name).name == db_name
+    assert isinstance(arango_client.db(db_name), Database)
+    assert arango_client.db(db_name).name == db_name
 
     # Test create duplicate database
     with pytest.raises(DatabaseCreateError):
-        conn.create_database(db_name)
+        arango_client.create_database(db_name)
 
     # Test list after create database
-    assert db_name in conn.databases()
+    assert db_name in arango_client.databases()
 
     # Test drop database
-    result = conn.drop_database(db_name)
+    result = arango_client.drop_database(db_name)
     assert result is True
-    assert db_name not in conn.databases()
+    assert db_name not in arango_client.databases()
 
     # Test drop missing database
     with pytest.raises(DatabaseDeleteError):
-        conn.drop_database(db_name)
+        arango_client.drop_database(db_name)
 
     # Test drop missing database (ignore missing)
-    result = conn.drop_database(db_name, ignore_missing=True)
+    result = arango_client.drop_database(db_name, ignore_missing=True)
     assert result is False
 
 
 def test_user_management():
     # Test get users
-    users = conn.users()
+    users = arango_client.users()
     assert isinstance(users, dict)
     assert 'root' in users
 
@@ -181,10 +181,10 @@ def test_user_management():
     assert 'extra'in root_user
     assert 'change_password' in root_user
 
-    assert username not in conn.users()
+    assert username not in arango_client.users()
 
     # Test create user
-    user = conn.create_user(
+    user = arango_client.create_user(
         username,
         'password',
         active=True,
@@ -194,32 +194,29 @@ def test_user_management():
     assert user['active'] is True
     assert user['extra'] == {'hello': 'world'}
     assert user['change_password'] is False
-    assert username in conn.users()
+    assert username in arango_client.users()
 
     # Test create duplicate user
     with pytest.raises(UserCreateError):
-        conn.create_user(username, 'password')
+        arango_client.create_user(username, 'password')
 
-    missing = generate_user_name(conn)
+    missing = generate_user_name(arango_client)
 
     # Test update user
-    user = conn.update_user(
+    user = arango_client.update_user(
         username,
-        password='test',
+        password='new_password',
         active=False,
         extra={'foo': 'bar'},
         change_password=True
     )
     assert user['active'] is False
-    assert user['extra'] == {
-        'hello': 'world',
-        'foo': 'bar'
-    }
-    assert user['change_password'] is True
+    assert user['extra'] == {'hello': 'world', 'foo': 'bar'}
+    assert user['change_password'] is False
 
     # Test update missing user
     with pytest.raises(UserUpdateError):
-        conn.update_user(
+        arango_client.update_user(
             missing,
             password='test',
             active=False,
@@ -228,7 +225,7 @@ def test_user_management():
         )
 
     # Test replace user
-    user = conn.replace_user(
+    user = arango_client.replace_user(
         username,
         password='test',
         active=True,
@@ -241,7 +238,7 @@ def test_user_management():
 
     # Test replace missing user
     with pytest.raises(UserReplaceError):
-        conn.replace_user(
+        arango_client.replace_user(
             missing,
             password='test',
             active=True,
@@ -249,17 +246,31 @@ def test_user_management():
             change_password=False
         )
 
+    # Test revoke access
+    result = arango_client.revoke_user_access(username, db_name)
+    assert isinstance(result, bool)
+
+    with pytest.raises(UserRevokeAccessError):
+        arango_client.revoke_user_access(missing, db_name)
+
+    # Test grant access
+    result = arango_client.grant_user_access(username, db_name)
+    assert isinstance(result, bool)
+
+    with pytest.raises(UserGrantAccessError):
+        arango_client.grant_user_access(missing, db_name)
+
     # Test delete user
-    result = conn.delete_user(username)
+    result = arango_client.delete_user(username)
     assert result is True
-    assert username not in conn.users()
+    assert username not in arango_client.users()
 
     # Test delete missing user
     with pytest.raises(UserDeleteError):
-        conn.delete_user(username)
+        arango_client.delete_user(username)
 
     # Test delete missing user (ignore missing)
-    result = conn.delete_user(username, ignore_missing=True)
+    result = arango_client.delete_user(username, ignore_missing=True)
     assert result is False
 
 
@@ -267,7 +278,7 @@ def test_task_management():
     global task_id
 
     # Test get tasks
-    tasks = conn.tasks()
+    tasks = arango_client.tasks()
     assert isinstance(tasks, dict)
     for task in tasks.values():
         assert 'command' in task
@@ -277,17 +288,17 @@ def test_task_management():
         assert 'name' in task
 
     # Test get task
-    tasks = conn.tasks()
+    tasks = arango_client.tasks()
     if tasks:
         chosen_task_id = random.choice(list(tasks.keys()))
-        retrieved_task = conn.task(chosen_task_id)
+        retrieved_task = arango_client.task(chosen_task_id)
         assert tasks[chosen_task_id] == retrieved_task
 
     cmd = "(function(params) { require('internal').print(params); })(params)"
 
     # Test create task
-    assert task_name not in conn.tasks()
-    task = conn.create_task(
+    assert task_name not in arango_client.tasks()
+    task = arango_client.create_task(
         name=task_name,
         command=cmd,
         params={'foo': 'bar', 'bar': 'foo'},
@@ -295,18 +306,18 @@ def test_task_management():
         offset=3,
     )
     task_id = task['id']
-    assert task_id in conn.tasks()
-    assert task_name == conn.tasks()[task_id]['name']
+    assert task_id in arango_client.tasks()
+    assert task_name == arango_client.tasks()[task_id]['name']
 
     # Test get after create task
-    task = conn.task(task_id)
+    task = arango_client.task(task_id)
     assert task['command'] == cmd
     assert task['name'] == task_name
     assert task['period'] == 2
 
     # Test create duplicate task (with ID)
     with pytest.raises(TaskCreateError):
-        task = conn.create_task(
+        task = arango_client.create_task(
             task_id=task_id,
             name=task_name,
             command=cmd,
@@ -316,20 +327,20 @@ def test_task_management():
         )
 
     # Test delete task
-    result = conn.delete_task(task['id'])
+    result = arango_client.delete_task(task['id'])
     assert result is True
-    assert task_id not in conn.tasks()
+    assert task_id not in arango_client.tasks()
 
     # Test delete missing task
     with pytest.raises(TaskDeleteError):
-        conn.delete_task(task['id'])
+        arango_client.delete_task(task['id'])
 
     # Test delete missing task (ignore missing)
-    result = conn.delete_task(task['id'], ignore_missing=True)
+    result = arango_client.delete_task(task['id'], ignore_missing=True)
     assert result is False
 
     # Test create task with ID
-    task = conn.create_task(
+    task = arango_client.create_task(
         task_id=task_id,
         name=task_name,
         command=cmd,
@@ -343,7 +354,7 @@ def test_task_management():
     assert task['period'] == 3
 
     # Test get after create task with ID
-    task = conn.task(task_id)
+    task = arango_client.task(task_id)
     assert task['id'] == task_id
     assert task['command'] == cmd
     assert task['name'] == task_name

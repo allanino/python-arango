@@ -368,7 +368,7 @@ results.get("visited")
 results.get("paths")
 ```
 
-Batch Requests
+BatchExecution Requests
 --------------
 
 ```python

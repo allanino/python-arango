@@ -14,13 +14,14 @@ class Query(object):
 
     def __init__(self, connection):
         self._conn = connection
+        self._cache = QueryCache(self._conn)
 
     def __repr__(self):
         return "<ArangoDB Query>"
 
     @property
     def cache(self):
-        return QueryCache(self._conn)
+        return self._cache
 
     def explain(self, query, all_plans=False, max_plans=None,
                 optimizer_rules=None):
@@ -103,7 +104,7 @@ class Query(object):
         :type optimizer_rules: list
         :returns: document cursor
         :rtype: arango.cursor.Cursor
-        :raises: AQLQueryExecuteError, CursorDeleteError
+        :raises: AQLQueryExecuteError, CursorCloseError
         """
         options = {}
         if full_count is not None:
@@ -126,7 +127,7 @@ class Query(object):
         res = self._conn.post('/_api/cursor', data=data)
         if res.status_code not in HTTP_OK:
             raise AQLQueryExecuteError(res)
-        return Cursor(self._conn, res)
+        return Cursor(self._conn, res.body)
 
     def functions(self):
         """List the AQL functions defined in this database.

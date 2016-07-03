@@ -1,13 +1,1 @@
-{
-  "arango/tests/test_edges.py::test_add_cap_constraint": true, 
-  "arango/tests/test_edges.py::test_checksum": true, 
-  "arango/tests/test_edges.py::test_delete": true, 
-  "arango/tests/test_edges.py::test_find_and_delete": true, 
-  "arango/tests/test_edges.py::test_find_and_replace": true, 
-  "arango/tests/test_edges.py::test_first": true, 
-  "arango/tests/test_edges.py::test_last": true, 
-  "arango/tests/test_edges.py::test_properties": true, 
-  "arango/tests/test_edges.py::test_rename": true, 
-  "arango/tests/test_edges.py::test_replace": true, 
-  "arango/tests/test_edges.py::test_update": true
-}
+{}

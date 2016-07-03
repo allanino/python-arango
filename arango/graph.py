@@ -4,19 +4,19 @@ from arango.collection import BaseCollection
 from arango.constants import HTTP_OK
 from arango.exceptions import *
 from arango.request import Request
-from arango.wrapper import APIWrapper
+from arango.api import APIWrapper
 
 
 class Graph(APIWrapper):
     """ArangoDB graph object.
 
     :param connection: ArangoDB connection object
-    :type connection: arango.connection.Connection | arango.batch.Batch
+    :type connection: arango.connection.Connection | arango.batch.BatchExecution
     :param name: the name of the graph
     :type name: str
     """
 
-    _plain_methods = {
+    _bypass_methods = {
         'vertex_collection',
         'edge_collection',
         'name',
@@ -350,10 +350,10 @@ class Graph(APIWrapper):
 
 class VertexCollection(BaseCollection):
 
-    _plain_methods = {'name', 'graph'}
+    _bypass_methods = {'name', 'graph'}
 
     def __init__(self, connection, graph, name):
-        super(VertexCollection, self).__init__(connection, name, edge=False)
+        super(VertexCollection, self).__init__(connection, name)
         self._graph = graph
 
     def __repr__(self):
@@ -445,7 +445,7 @@ class VertexCollection(BaseCollection):
 
         return request, handler
 
-    def update_by_key(self, key, data, rev=None, sync=False, keep_none=True):
+    def update(self, key, data, rev=None, sync=False, keep_none=True):
         """Update the specified vertex in the graph.
 
         If ``keep_none`` is set to True, fields with value None are retained.
@@ -499,7 +499,7 @@ class VertexCollection(BaseCollection):
 
         return request, handler
 
-    def replace_by_key(self, key, data, rev=None, sync=False):
+    def replace(self, key, data, rev=None, sync=False):
         """Replace the specified vertex in the graph.
 
         If ``data`` contains the ``_key`` field, the field is ignored.
@@ -592,20 +592,22 @@ class VertexCollection(BaseCollection):
 
 class EdgeCollection(BaseCollection):
 
+    _bypass_methods = {'name', 'graph'}
+
     def __init__(self, connection, graph, name):
-        super(EdgeCollection, self).__init__(connection, name, edge=True)
+        super(EdgeCollection, self).__init__(connection, name)
         self._graph = graph
 
     def __repr__(self):
-        return "<ArangoDB edge collection '{}' in graph '{}'>".format(
+        return '<ArangoDB edge collection "{}" in graph "{}"'.format(
             self._name, self._graph
         )
 
     @property
     def name(self):
-        """Return the name of the vertex collection.
+        """Return the name of the collection.
 
-        :returns: the name of the vertex collection
+        :returns: the name of the collection
         :rtype: str
         """
         return self._name
@@ -619,57 +621,60 @@ class EdgeCollection(BaseCollection):
         """
         return self._graph
 
-    def insert(self, data, sync=False):
-        """Create an edge to the specified edge collection of the graph.
+    def insert(self, document, sync=False):
+        """Insert a new document into the collection.
 
-        The ``data`` must contain ``_from`` and ``_to`` keys with valid
-        vertex IDs as their values. If ``data`` contains the ``_key`` key,
-        its value must be unused in the collection.
-
-        :param data: the body of the new edge
-        :type data: dict
-        :param sync: wait for the create to sync to disk
+        :param document: the document body
+        :type document: dict
+        :param sync: wait for the operation to sync to disk
         :type sync: bool
-        :returns: the id, rev and key of the new edge
+        :returns: the id, rev and key of the target document
         :rtype: dict
-        :raises: DocumentInvalidError, EdgeCreateError
+        :raises: KeyError, DocumentInsertError
         """
+        for key in ['_from', '_to']:
+            if key not in document:
+                raise KeyError('The document is missing "{}"'.format(key))
+
         request = Request(
             method='post',
             endpoint="/_api/gharial/{}/edge/{}".format(
                 self._graph, self._name
             ),
-            data=data,
+            data=document,
             params={"waitForSync": sync}
         )
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise EdgeCreateError(res)
+                raise DocumentInsertError(res)
             return res.body["edge"]
 
         return request, handler
 
-    def get(self, key, rev=None):
-        """Return the edge of the specified ID in the graph.
+    def get(self, filters):
+        """Fetch a document from the collection.
 
-        If the edge revision ``rev`` is specified, it must match against
-        the revision of the retrieved edge.
-
-        :param key: the key of the edge to retrieve
-        :type key: str
-        :param rev: the edge revision must match the value
-        :type rev: str | None
+        :param filters:
+        :type filters: str
         :returns: the requested edge | None if not found
         :rtype: dict | None
         :raises: EdgeRevisionError, EdgeGetError
         """
+        if '_key' not in filters:
+            raise KeyError('The document filter is missing "_key"')
+
+        headers, params = {}, {}
+        if '_rev' in filters:
+            headers['If-Match'] = filters['_rev']
+
         request = Request(
             method='get',
-            endpoint='/_api/gharial/{}/edge/{}'.format(
-                self._graph, self._name, key
+            endpoint='/_api/gharial/{}/edge/{}/{}'.format(
+                self._graph, self._name, filters['_key']
             ),
-            params={} if rev is None else {"rev": rev}
+            params=params,
+            headers=headers
         )
 
         def handler(res):
@@ -683,11 +688,11 @@ class EdgeCollection(BaseCollection):
 
         return request, handler
 
-    def update_by_key(self, key, data, rev=None, keep_none=True, sync=False):
-        """Update the edge of the specified ID in the graph.
+    def update(self, document, keep_none=True, sync=False):
+        """Update an edge in the edge collection.
 
-        If ``keep_none`` is set to True, then attributes with values None
-        are retained. Otherwise, they are deleted from the edge.
+        If ``keep_none`` is set to True, then key with values None are
+        retained in the edge. Otherwise, they are removed from the edge.
 
         If ``data`` contains the ``_key`` key, it is ignored.
 
@@ -698,130 +703,138 @@ class EdgeCollection(BaseCollection):
         The ``_from`` and ``_to`` attributes are immutable, and they are
         ignored if present in ``data``
 
-        :param key: the key of the edge to be deleted
-        :type key: str
-        :param data: the body to update the edge with
-        :type data: dict
-        :param rev: the edge revision must match the value
-        :type rev: str | None
-        :param keep_none: whether or not to keep the keys with value None
+        :param document: the document body
+        :type document: dict
+        :param keep_none: whether to retain the keys with value None
         :type keep_none: bool
-        :param sync: wait for the update to sync to disk
+        :param sync: wait for the operation to sync to disk
         :type sync: bool
-        :returns: the id, rev and key of the updated edge
+        :returns: the id, rev and key of the target document
         :rtype: dict
-        :raises: EdgeRevisionError, EdgeUpdateError
+        :raises: DocumentRevisionError, DocumentUpdateError
         """
-        params = {
-            "waitForSync": sync,
-            "keepNull": keep_none
-        }
-        if rev is not None:
-            params["rev"] = rev
-        elif "_rev" in data:
-            params["rev"] = data["_rev"]
+        if '_key' not in document:
+            raise KeyError('The document is missing "_key"')
+
+        headers, params = {}, {}
+        if sync is not None:
+            params['waitForSync'] = sync
+        if keep_none is not None:
+            params['keepNull'] = keep_none
+        if '_rev' in document:
+            headers['If-Match'] = document['_rev']
 
         request = Request(
             method='patch',
             endpoint='/_api/gharial/{}/edge/{}/{}'.format(
-                self._graph, self._name, key
+                self._graph, self._name, document['_key']
             ),
-            data=data,
-            params=params
+            data=document,
+            params=params,
+            headers=headers
         )
 
         def handler(res):
             if res.status_code == 412:
-                raise EdgeRevisionError(res)
-            elif res.status_code not in {200, 202}:
-                raise EdgeUpdateError(res)
+                raise DocumentRevisionError(res)
+            elif res.status_code not in HTTP_OK:
+                raise DocumentUpdateError(res)
             return res.body["edge"]
 
         return request, handler
 
-    def replace_by_key(self, key, data, rev=None, sync=False):
-        """Replace the edge of the specified ID in the graph.
+    def replace(self, document, sync=None):
+        """Replace a document in the collection.
 
-        If ``data`` contains the ``_key`` key, it is ignored.
+        The ``document`` must contain the keys "_key", "_from" and "_to".
 
-        If the ``_rev`` key is in ``data``, the revision of the target
-        edge must match against its value. Otherwise a EdgeRevision
-        error is thrown. If ``rev`` is also provided, its value is preferred.
+        If the ``document`` contains the key "_rev", its value is compared
+        with the revision of the target document. If the revisions do not
+        match, DocumentRevisionError is raised.
 
-        The ``_from`` and ``_to`` attributes are immutable, and they are
-        ignored if present in ``data``
-
-        :param key: the key of the edge to be deleted
-        :type key: str
-        :param data: the body to replace the edge with
-        :type data: dict
-        :param rev: the edge revision must match the value
-        :type rev: str | None
-        :param sync: wait for the replace to sync to disk
+        :param document: the document body
+        :type document: dict
+        :param sync: wait for the operation to sync to disk
         :type sync: bool
-        :returns: the id, rev and key of the replaced edge
+        :returns: the id, rev and key of the target document
         :rtype: dict
-        :raises: EdgeRevisionError, EdgeReplaceError
+        :raises: KeyError, DocumentRevisionError, DocumentReplaceError
         """
-        params = {"waitForSync": sync}
-        if rev is not None:
-            params["rev"] = rev
-        elif "_rev" in data:
-            params["rev"] = data["_rev"]
+        for key in ['_key', '_from', '_to']:
+            if key not in document:
+                raise KeyError('The document is missing "{}"'.format(key))
+
+        headers, params = {}, {}
+        if sync is not None:
+            params['waitForSync'] = sync
+        if '_rev' in document:
+            headers['If-Match'] = document['_rev']
 
         request = Request(
             method='put',
             endpoint='/_api/gharial/{}/edge/{}/{}'.format(
-                self._graph, self._name, key
+                self._graph, self._name, document['_key']
             ),
-            data=data,
-            params=params
+            data=document,
+            params=params,
+            headers=headers
         )
 
         def handler(res):
             if res.status_code == 412:
-                raise EdgeRevisionError(res)
-            elif res.status_code not in {200, 202}:
-                raise EdgeReplaceError(res)
+                raise DocumentRevisionError(res)
+            elif res.status_code not in HTTP_OK:
+                raise DocumentReplaceError(res)
             return res.body["edge"]
 
         return request, handler
 
-    def delete(self, key, rev=None, sync=False, ignore_missing=True):
-        """Delete the edge of the specified ID from the graph.
+    def delete(self, document, sync=None, ignore_missing=True):
+        """Delete a document from the collection.
 
-        :param key: the key of the edge to be deleted
-        :type key: str
-        :param rev: the edge revision must match the value
-        :type rev: str | None
-        :param sync: wait for the create to sync to disk
+        The ``document`` must contain the key "_key".
+
+        If the ``ignore_missing`` flag is set to True, the method simply
+        returns when the target document is not found. If the flag is set
+        to True, DocumentDeleteError is raised instead.
+
+        :param document: the body of the document
+        :type document: dict
+        :param sync: wait for the operation to sync to disk
         :type sync: bool
-        :param ignore_missing: ignore missing vertex
+        :param ignore_missing: do not raise an error if document is missing
         :type ignore_missing: bool
-        :raises: EdgeRevisionError, EdgeDeleteError
+        :returns: the id, rev and key of the target document
+        :rtype: dict
+        :raises: KeyError, DocumentRevisionError, DocumentDeleteError
         """
-        params = {"waitForSync": sync}
-        if rev is not None:
-            params["rev"] = rev
+        if '_key' not in document:
+            raise KeyError('The document is missing "_key"')
+
+        headers, params = {}, {}
+        if sync is not None:
+            params['waitForSync'] = sync
+        if '_rev' in document:
+            headers['If-Match'] = document['_rev']
 
         request = Request(
             method='delete',
             endpoint='/_api/gharial/{}/edge/{}/{}'.format(
-                self._graph, self._name, key
+                self._graph, self._name, document['_key']
             ),
-            params=params
+            params=params,
+            headers=headers
         )
 
         def handler(res):
             if res.status_code == 412:
-                raise EdgeRevisionError(res)
+                raise DocumentRevisionError(res)
             elif res.status_code == 404:
                 if ignore_missing:
-                    return False
-                else:
-                    raise EdgeDeleteError(res)
+                    return
+                raise DocumentDeleteError(res)
             elif res.status_code not in HTTP_OK:
-                raise EdgeDeleteError(res)
+                raise DocumentDeleteError(res)
             return not res.body['error']
 
         return request, handler

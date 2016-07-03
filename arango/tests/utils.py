@@ -4,16 +4,16 @@ from random import randint
 from collections import Mapping, Iterable
 
 
-def generate_db_name(conn):
+def generate_db_name(client):
     """Generate and return the next available database name.
 
-    :param conn: ArangoDB connection
-    :type conn: arango.connection.Connection
+    :param client: ArangoDB client
+    :type client: arango.ArangoClient
     :returns: the next available database name
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(conn.databases())
+    existing = set(client.databases())
     while "test_database_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_database_{num:06d}".format(num=num)
@@ -49,31 +49,31 @@ def generate_graph_name(database):
     return "test_graph_{num:06d}".format(num=num)
 
 
-def generate_task_name(conn):
+def generate_task_name(client):
     """Generate and return the next available task name.
 
-    :param conn: ArangoDB connection
-    :type conn: arango.connection.Connection
+    :param client: ArangoDB client
+    :type client: arango.ArangoClient
     :returns: the next available database name
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(task['name'] for task in conn.tasks().values())
+    existing = set(task['name'] for task in client.tasks().values())
     while "test_task_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_task_{num:06d}".format(num=num)
 
 
-def generate_user_name(conn):
+def generate_user_name(client):
     """Generate and return the next available user name.
 
-    :param conn: ArangoDB connection
-    :type conn: arango.connection.Connection
+    :param client: ArangoDB client
+    :type client: arango.ArangoClient
     :returns: the next available database name
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(conn.users())
+    existing = set(client.users())
     while "test_user_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_user_{num:06d}".format(num=num)

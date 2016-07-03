@@ -2,10 +2,10 @@ from __future__ import absolute_import, unicode_literals
 
 import pytest
 
-from arango.connection import Connection
+from arango import ArangoClient
 
-conn = Connection()
-wal = conn.wal
+arango_client = ArangoClient()
+wal = arango_client.wal
 
 
 @pytest.mark.order1
@@ -27,7 +27,7 @@ def test_wal_set_options():
         throttle_limit=1000,
         throttle_wait=16000
     )
-    options = conn.wal.properties()
+    options = arango_client.wal.properties()
     assert options['historic_logs'] == 15
     assert options['oversized_ops'] is False
     assert options['log_size'] == 30000000

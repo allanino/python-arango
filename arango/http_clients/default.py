@@ -3,7 +3,7 @@
 from requests import Session
 
 from arango.response import Response
-from arango.clients.base import BaseHTTPClient
+from arango.http_clients.base import BaseHTTPClient
 
 
 class DefaultHTTPClient(BaseHTTPClient):

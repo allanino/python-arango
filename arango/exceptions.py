@@ -144,7 +144,11 @@ class DatabaseDeleteError(ArangoError):
 
 
 class UserListError(ArangoError):
-    """Failed to get the list of users."""
+    """Failed to get the users."""
+
+
+class UserGetError(ArangoError):
+    """Failed to get the user."""
 
 
 class UserCreateError(ArangoError):
@@ -162,6 +166,13 @@ class UserReplaceError(ArangoError):
 class UserDeleteError(ArangoError):
     """Failed to delete the user."""
 
+
+class UserGrantAccessError(ArangoError):
+    """Failed to grant user access to a database."""
+
+
+class UserRevokeAccessError(ArangoError):
+    """Failed to revoke user access to a database."""
 
 #########################
 # Collection Exceptions #
@@ -390,11 +401,11 @@ class AQLQueryCacheConfigureError(ArangoError):
 # Cursor Exceptions #
 #####################
 
-class CursorGetNextError(ArangoError):
+class CursorNextError(ArangoError):
     """Failed to get the next cursor result."""
 
 
-class CursorDeleteError(ArangoError):
+class CursorCloseError(ArangoError):
     """Failed to delete the cursor."""
 
 
@@ -494,7 +505,7 @@ class TransactionGetError(ArangoError):
 
 
 ####################
-# Batch Exceptions #
+# BatchExecution Exceptions #
 ####################
 
 
@@ -588,15 +599,34 @@ class ServerRoleGetError(ArangoError):
     """Failed to get the role of the server in a cluster."""
 
 
-#####################
-# Asynchronous Jobs #
-#####################
+##########################
+# Asynchronous Execution #
+##########################
+
+class AsyncExecuteError(ArangoError):
+    """Failed to execute an asynchronous request."""
 
 
-class JobInvalidError(ArangoError):
-    """Failed to retrieve the async job ID."""
+class AsyncJobInvalidError(ArangoError):
+    """Failed to retrieve the asynchronous job ID."""
 
 
-class JobNotFoundError(ArangoError):
-    """Failed to find the job (already deleted/fetched)"""
+class AsyncJobNotFoundError(ArangoError):
+    """Failed to find the asynchronous job (already deleted/fetched)"""
+
+
+class AsyncJobCancelError(ArangoError):
+    """Failed to cancel the asynchronous job."""
+
+
+class AsyncResultGetError(ArangoError):
+    """Failed to get the asynchronous result from the server."""
+
+
+class AsyncResultPopError(ArangoError):
+    """Failed to pop the asynchronous result from the server."""
+
+
+class AsyncResultDeleteError(ArangoError):
+    """Failed to delete the asynchronous result from the server."""
 

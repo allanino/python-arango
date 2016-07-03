@@ -12,9 +12,9 @@ class Request(object):
     def __init__(self, method, endpoint, headers=None, params=None, data=None):
         self.method = method
         self.endpoint = endpoint
-        self.headers = headers
-        self.params = params
-        self.data = data
+        self.headers = headers or {}
+        self.params = params or {}
+        self.data = data or {}
 
     def __repr__(self):
         return "<ArangoDB request '{} {}'>".format(
@@ -32,7 +32,7 @@ class Request(object):
 
     def stringify(self):
         path = self.endpoint
-        if self.params is not None:
+        if self.params:
             path += "?" + moves.urllib.parse.urlencode(self.params)
         request_string = "{} {} HTTP/1.1".format(self.method, path)
         if self.headers:

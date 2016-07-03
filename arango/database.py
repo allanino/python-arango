@@ -1,8 +1,7 @@
 from __future__ import unicode_literals
 
-from copy import deepcopy
-
-from arango.batch import Batch
+from arango.async import AsyncExecution
+from arango.batch import BatchExecution
 from arango.collection import Collection
 from arango.constants import (
     HTTP_OK,
@@ -26,15 +25,13 @@ class Database(object):
     :type connection: arango.connection.Connection
     """
 
-    def __init__(self, connection, name):
-        connection = deepcopy(connection)
-        connection.set_db(name)
-        self._name = name
+    def __init__(self, connection):
         self._conn = connection
+        self._query = Query(self._conn)
 
     def __repr__(self):
         """Return a descriptive string of this instance."""
-        return "<ArangoDB database '{}'>".format(self._name)
+        return '<ArangoDB database "{}">'.format(self._conn.database)
 
     def __getitem__(self, name):
         """Return the collection of the given name."""
@@ -47,17 +44,20 @@ class Database(object):
         :returns: the name of the database
         :rtype: str
         """
-        return self._name
+        return self._conn.database
 
     @property
     def query(self):
-        return Query(self._conn)
+        return self._query
+
+    def async(self, return_result=True):
+        return AsyncExecution(self._conn, return_result)
 
     def batch(self, return_result=True):
-        return Batch(self._conn, return_result)
+        return BatchExecution(self._conn, return_result)
 
-    def transaction(self):
-        return Transaction(self._conn)
+    def transaction(self, return_result=True):
+        return Transaction(self._conn, return_result)
 
     def options(self):
         """Return all properties of this database.

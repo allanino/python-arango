@@ -1,5 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 
+from arango.connection import Connection
 from arango.collection import Collection
 from arango.graph import Graph
 from arango.constants import HTTP_OK
@@ -7,19 +8,23 @@ from arango.exceptions import BatchExecuteError
 from arango.response import Response
 
 
-class Batch(object):
-    """ArangoDB batch query object.
-
-    :param connection: ArangoDB connection object
-    :type connection: arango.connection.Connection
-    """
+class BatchExecution(Connection):
+    """ArangoDB batch execution object."""
 
     def __init__(self, connection, return_result=True):
-        self._conn = connection
+        super(BatchExecution, self).__init__(
+            protocol=connection.protocol,
+            host=connection.host,
+            port=connection.port,
+            username=connection.username,
+            password=connection.password,
+            client=connection.client,
+            database=connection.database
+        )
+        self._return_result = return_result
         self._requests = []
         self._handlers = []
-        self._type = 'batch'
-        self._return = return_result
+        self._results = []
 
     def __enter__(self):
         return self
@@ -28,16 +33,10 @@ class Batch(object):
         return self.commit()
 
     def __repr__(self):
-        return '<ArangoDB batch query ({} requests)>'.format(
-            len(self._requests)
-        )
+        return '<ArangoDB batch execute>'
 
-    @property
-    def type(self):
-        return self._type
-
-    def add(self, request, handler):
-        """Add a request to the batch query.
+    def handle_request(self, request, handler):
+        """Add an API request to the batch execution.
 
         This method should only be called internally.
 
@@ -45,16 +44,15 @@ class Batch(object):
         :type request: arango.request.Request
         :param handler: the handler function
         :type handler: callable
-        :return:
         """
         self._requests.append(request)
         self._handlers.append(handler)
 
     def commit(self):
-        """Execute the batch query in call.
+        """Execute the batch of API requests in a single HTTP call.
 
-        If ``return_response`` was is to True, the responses are returned in
-        the same order as the requests added.
+        If ``return_response`` was set to True, the responses are returned in
+        the same order as the added requests.
 
         :returns: the result
         :rtype: list | None
@@ -71,7 +69,7 @@ class Batch(object):
                 raw_data += '{}\r\n'.format(request.stringify())
             raw_data += '--XXXsubpartXXX--\r\n\r\n'
 
-            res = self._conn.post(
+            res = self.post(
                 endpoint='/_api/batch',
                 headers={
                     'Content-Type': (
@@ -82,10 +80,8 @@ class Batch(object):
             )
             if res.status_code not in HTTP_OK:
                 raise BatchExecuteError(res)
-            if not self._return:
+            if not self._return_result:
                 return
-            responses = []
-            url_prefix = self._conn.url_prefix
             # TODO do something about this ugly ass parsing
             for index, raw_res in enumerate(
                 res.raw_body.split('--XXXsubpartXXX')[1:-1]
@@ -99,21 +95,24 @@ class Batch(object):
                 try:
                     result = handler(Response(
                         method=request.method,
-                        url=url_prefix + request.endpoint,
+                        url=self._url_prefix + request.endpoint,
                         headers=request.headers,
                         status_code=int(status_code),
                         status_text=status_text,
                         body=raw_body
                     ))
                 except Exception as err:
-                    responses.append(err)
+                    self._results.append(err)
                 else:
-                    responses.append(result)
-            return responses
+                    self._results.append(result)
+            return self._results
         finally:
             self._requests, self._handlers = [], []
 
-    def collection(self, name, edge=False):
+    def result(self):
+        return self._results
+
+    def collection(self, name):
         """Return the Collection object of the specified name.
 
         :param name: the name of the collection
@@ -124,7 +123,7 @@ class Batch(object):
         :rtype: arango.collection.Collection
         :raises: TypeError
         """
-        return Collection(self, name, edge)
+        return Collection(self, name)
 
     def graph(self, name):
         """Return the Graph object of the specified name.
