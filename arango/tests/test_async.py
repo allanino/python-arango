@@ -33,7 +33,8 @@ def test_async_insert():
     job2 = async.collection(col_name).insert({'_key': '2', 'val': 2})
     job3 = async.collection(col_name).insert({'_key': '3', 'val': 3})
 
-    print(job1)
-    print(job2)
-    print(job3)
+    sleep(1)
+    print(job1.result())
+    print(job2.result())
+    print(job3.result())
     assert len(col) == 3

@@ -1,6 +1,6 @@
 """Session based client using requests."""
 
-from requests import Session
+import requests
 
 from arango.response import Response
 from arango.http_clients.base import BaseHTTPClient
@@ -9,9 +9,17 @@ from arango.http_clients.base import BaseHTTPClient
 class DefaultHTTPClient(BaseHTTPClient):
     """Session based HTTP client for ArangoDB."""
 
-    def __init__(self):
+    def __init__(self, use_session=True):
         """Initialize the session."""
-        self.session = Session()
+        if use_session:
+            self._session = requests.Session()
+        else:
+            self._session = requests
+
+    def close_session(self):
+        """Close the HTTP session."""
+        if isinstance(self._session, requests.Session):
+            self._session.close()
 
     def head(self, url, params=None, headers=None, auth=None, **kwargs):
         """HTTP HEAD method.
@@ -27,7 +35,7 @@ class DefaultHTTPClient(BaseHTTPClient):
         :returns: ArangoDB http response object
         :rtype: arango.response.Response
         """
-        res = self.session.head(
+        res = self._session.head(
             url=url,
             params=params,
             headers=headers,
@@ -56,7 +64,7 @@ class DefaultHTTPClient(BaseHTTPClient):
         :returns: ArangoDB http response object
         :rtype: arango.response.Response
         """
-        res = self.session.get(
+        res = self._session.get(
             url=url,
             params=params,
             headers=headers,
@@ -87,7 +95,7 @@ class DefaultHTTPClient(BaseHTTPClient):
         :returns: ArangoDB http response object
         :rtype: arango.response.Response
         """
-        res = self.session.put(
+        res = self._session.put(
             url=url,
             data=data,
             params=params,
@@ -119,7 +127,7 @@ class DefaultHTTPClient(BaseHTTPClient):
         :returns: ArangoDB http response object
         :rtype: arango.response.Response
         """
-        res = self.session.post(
+        res = self._session.post(
             url=url,
             data=data,
             params=params,
@@ -151,7 +159,7 @@ class DefaultHTTPClient(BaseHTTPClient):
         :returns: ArangoDB http response object
         :rtype: arango.response.Response
         """
-        res = self.session.patch(
+        res = self._session.patch(
             url=url,
             data=data,
             params=params,
@@ -181,7 +189,7 @@ class DefaultHTTPClient(BaseHTTPClient):
         :returns: ArangoDB http response object
         :rtype: arango.response.Response
         """
-        res = self.session.delete(
+        res = self._session.delete(
             url=url,
             params=params,
             headers=headers,
@@ -195,7 +203,3 @@ class DefaultHTTPClient(BaseHTTPClient):
             status_text=res.reason,
             body=res.text
         )
-
-    def close(self):
-        """Close the HTTP session."""
-        self.session.close()

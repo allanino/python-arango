@@ -8,7 +8,7 @@ from arango.exceptions import *
 class Query(object):
     """ArangoDB AQL query object.
 
-    :param connection: ArangoDB API connection object
+    :param connection: ArangoDB database connection object
     :type connection: arango.connection.Connection
     """
 

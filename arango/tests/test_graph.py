@@ -421,12 +421,12 @@ def test_delete_vertex():
     vcol.insert({'_key': '3', 'value': 3})
 
     # Test vertex delete
-    assert vcol.delete('1') == True
+    assert vcol.clear('1') == True
     assert vcol.get('1') is None
     assert '1' not in vcol
 
     # Test vertex delete with sync
-    assert vcol.delete('3', sync=True) == True
+    assert vcol.clear('3', sync=True) == True
     assert vcol.get('3') is None
     assert '3' not in vcol
 
@@ -434,16 +434,16 @@ def test_delete_vertex():
     old_rev = vcol.get('2')['_rev']
     new_rev = str(int(old_rev) + 10)
     with pytest.raises(VertexRevisionError):
-        vcol.delete('2', rev=new_rev)
+        vcol.clear('2', rev=new_rev)
     assert '2' in vcol
 
     # Test delete vertex from missing collection
     with pytest.raises(VertexDeleteError):
-        graph.vertex_collection('missing').delete('1', ignore_missing=False)
+        graph.vertex_collection('missing').clear('1', ignore_missing=False)
 
     # Test delete missing vertex
     with pytest.raises(VertexDeleteError):
-        vcol.delete('10', ignore_missing=False)
+        vcol.clear('10', ignore_missing=False)
 
 
 @pytest.mark.order15

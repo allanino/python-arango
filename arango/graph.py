@@ -11,7 +11,7 @@ class Graph(APIWrapper):
     """ArangoDB graph object.
 
     :param connection: ArangoDB connection object
-    :type connection: arango.connection.Connection | arango.batch.BatchExecution
+    :type connection: arango.connection.Connection
     :param name: the name of the graph
     :type name: str
     """

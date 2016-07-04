@@ -16,7 +16,7 @@ class BaseCollection(APIWrapper):
     """Base class for ArangoDB collection-specific API endpoints.
 
     :param connection: ArangoDB connection object
-    :type connection: arango.connection.Connection | arango.batch.BatchExecution
+    :type connection: arango.connection.Connection
     :param name: the name of the collection
     :type name: str
     """
@@ -987,8 +987,8 @@ class BaseCollection(APIWrapper):
 class Collection(BaseCollection):
     """Wrapper for ArangoDB's collection-specific APIs.
 
-    :param connection: ArangoDB API connection object
-    :type connection: arango.connection.Connection | arango.batch.BatchExecution
+    :param connection: ArangoDB database connection object
+    :type connection: arango.connection.Connection
     :param name: the name of the collection
     :type name: str
     """
@@ -1332,16 +1332,11 @@ class Collection(BaseCollection):
                 raise DocumentRevisionError(res)
             elif res.status_code == 404:
                 if ignore_missing:
-                    return False
-                else:
-                    raise DocumentDeleteError(res)
+                    return None
+                raise DocumentDeleteError(res)
             elif res.status_code not in HTTP_OK:
                 raise DocumentDeleteError(res)
-            return {
-                'id': res.body['_id'],
-                'key': res.body['_key'],
-                'revision': res.body['_rev']
-            }
+            return res.body
 
         return request, handler
 

@@ -611,6 +611,10 @@ class AsyncJobInvalidError(ArangoError):
     """Failed to retrieve the asynchronous job ID."""
 
 
+class AsyncJobNotDoneError(ArangoError):
+    """The asynchronous job is still pending in the queue."""
+
+
 class AsyncJobNotFoundError(ArangoError):
     """Failed to find the asynchronous job (already deleted/fetched)"""
 
@@ -619,14 +623,14 @@ class AsyncJobCancelError(ArangoError):
     """Failed to cancel the asynchronous job."""
 
 
-class AsyncResultGetError(ArangoError):
+class AsyncJobStatusError(ArangoError):
     """Failed to get the asynchronous result from the server."""
 
 
-class AsyncResultPopError(ArangoError):
+class AsyncJobResultGetError(ArangoError):
     """Failed to pop the asynchronous result from the server."""
 
 
-class AsyncResultDeleteError(ArangoError):
+class AsyncJobResultDeleteError(ArangoError):
     """Failed to delete the asynchronous result from the server."""
 

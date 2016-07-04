@@ -6,7 +6,7 @@ from arango.exceptions import *
 class Transaction(object):
     """ArangoDB transaction object.
 
-    :param connection: ArangoDB API connection object
+    :param connection: ArangoDB database connection object
     :type connection: arango.connection.Connection
     """
 
