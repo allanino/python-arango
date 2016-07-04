@@ -16,7 +16,7 @@ class Graph(APIWrapper):
     :type name: str
     """
 
-    _bypass_methods = {
+    _internal_methods = {
         'vertex_collection',
         'edge_collection',
         'name',

@@ -6,11 +6,11 @@ from functools import wraps
 class APIWrapper(object):
     """ArangoDB API wrapper."""
 
-    _bypass_methods = {'name'}
+    _internal_methods = {'name'}
 
     def __getattribute__(self, attr):
         method = object.__getattribute__(self, attr)
-        if attr.startswith('_') or attr in self._bypass_methods:
+        if attr.startswith('_') or attr in self._internal_methods:
             return method
 
         conn = object.__getattribute__(self, '_conn')
