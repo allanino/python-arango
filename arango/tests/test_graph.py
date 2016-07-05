@@ -90,9 +90,9 @@ def test_delete_vertex_collection():
 
 @pytest.mark.order6
 def test_create_edge_definition():
-    assert graph.edge_definitions() == []
-    assert graph.create_edge_definition('ecol1', [], []) == True
-    assert graph.edge_definitions() == [{
+    assert graph.edge_collections() == []
+    assert graph.create_edge_collection('ecol1', [], []) == True
+    assert graph.edge_collections() == [{
         'name': 'ecol1',
         'from_collections': [],
         'to_collections': []
@@ -101,8 +101,8 @@ def test_create_edge_definition():
 
     # Test create duplicate edge definition
     with pytest.raises(EdgeDefinitionCreateError):
-        assert graph.create_edge_definition('ecol1', [], [])
-    assert graph.edge_definitions() == [{
+        assert graph.create_edge_collection('ecol1', [], [])
+    assert graph.edge_collections() == [{
         'name': 'ecol1',
         'from_collections': [],
         'to_collections': []
@@ -111,8 +111,8 @@ def test_create_edge_definition():
     # Test create edge definition with existing vertex collection
     assert graph.create_vertex_collection('vcol1') == True
     assert graph.create_vertex_collection('vcol2') == True
-    assert graph.create_edge_definition('ecol2', ['vcol1'], ['vcol2']) == True
-    assert graph.edge_definitions() == [
+    assert graph.create_edge_collection('ecol2', ['vcol1'], ['vcol2']) == True
+    assert graph.edge_collections() == [
         {
             'name': 'ecol1',
             'from_collections': [],
@@ -127,8 +127,8 @@ def test_create_edge_definition():
     assert 'ecol2' in db.collections()
 
     # Test create edge definition with missing vertex collection
-    assert graph.create_edge_definition('ecol3', ['vcol3'], ['vcol3']) == True
-    assert graph.edge_definitions() == [
+    assert graph.create_edge_collection('ecol3', ['vcol3'], ['vcol3']) == True
+    assert graph.edge_collections() == [
         {
             'name': 'ecol1',
             'from_collections': [],
@@ -153,7 +153,7 @@ def test_create_edge_definition():
 
 @pytest.mark.order7
 def test_list_edge_definitions():
-    assert graph.edge_definitions() == [
+    assert graph.edge_collections() == [
         {
             'name': 'ecol1',
             'from_collections': [],
@@ -174,13 +174,13 @@ def test_list_edge_definitions():
 
 @pytest.mark.order8
 def test_replace_edge_definition():
-    assert graph.replace_edge_definition(
+    assert graph.replace_edge_collection(
         name='ecol1',
         from_collections=['vcol3'],
         to_collections=['vcol2']
     ) == True
     assert graph.orphan_collections() == ['vcol1']
-    assert graph.edge_definitions() == [
+    assert graph.edge_collections() == [
         {
             'name': 'ecol1',
             'from_collections': ['vcol3'],
@@ -197,25 +197,25 @@ def test_replace_edge_definition():
             'to_collections': ['vcol3']
         }
     ]
-    assert graph.replace_edge_definition(
+    assert graph.replace_edge_collection(
         name='ecol2',
         from_collections=['vcol1'],
         to_collections=[]
     ) == True
     assert graph.orphan_collections() == []
     assert 'vcol3' not in graph.orphan_collections()
-    assert graph.replace_edge_definition(
+    assert graph.replace_edge_collection(
         name='ecol3',
         from_collections=['vcol4'],
         to_collections=['vcol4']
     ) == True
     with pytest.raises(EdgeDefinitionReplaceError):
-        graph.replace_edge_definition(
+        graph.replace_edge_collection(
             name='ecol4',
             from_collections=[],
             to_collections=['vcol1']
         )
-    assert graph.edge_definitions() == [
+    assert graph.edge_collections() == [
         {
             'name': 'ecol1',
             'from_collections': ['vcol3'],
@@ -237,8 +237,8 @@ def test_replace_edge_definition():
 
 @pytest.mark.order9
 def test_delete_edge_definition():
-    assert graph.delete_edge_definition('ecol3') == True
-    assert graph.edge_definitions() == [
+    assert graph.delete_edge_collection('ecol3') == True
+    assert graph.edge_collections() == [
         {
             'name': 'ecol1',
             'from_collections': ['vcol3'],
@@ -256,10 +256,10 @@ def test_delete_edge_definition():
     assert 'ecol3' in db.collections()
 
     with pytest.raises(EdgeDefinitionDeleteError):
-        graph.delete_edge_definition('ecol3')
+        graph.delete_edge_collection('ecol3')
 
-    assert graph.delete_edge_definition('ecol1', purge=True) == True
-    assert graph.edge_definitions() == [
+    assert graph.delete_edge_collection('ecol1', purge=True) == True
+    assert graph.edge_collections() == [
         {
             'name': 'ecol2',
             'from_collections': ['vcol1'],

@@ -162,10 +162,10 @@ class Graph(APIWrapper):
     # Edge Definition Management #
     ##############################
 
-    def edge_definitions(self):
-        """Return the edge definitions of the graph.
+    def edge_collections(self):
+        """Return the edge collections/definitions of the graph.
 
-        :returns: the edge definitions of the graph
+        :returns: the edge collections/definitions of the graph
         :rtype: list
         :raises: EdgeDefinitionListError
         """
@@ -189,7 +189,7 @@ class Graph(APIWrapper):
 
         return request, handler
 
-    def create_edge_definition(self, name, from_collections, to_collections):
+    def create_edge_collection(self, name, from_collections, to_collections):
         """Create a new edge definition for the graph.
 
         An edge definition consists of an edge collection, ``from`` vertex
@@ -222,7 +222,7 @@ class Graph(APIWrapper):
 
         return request, handler
 
-    def replace_edge_definition(self, name, from_collections, to_collections):
+    def replace_edge_collection(self, name, from_collections, to_collections):
         """Replace the specified edge definition in the graph.
 
         :param name: the name of the edge definition
@@ -254,7 +254,7 @@ class Graph(APIWrapper):
 
         return request, handler
 
-    def delete_edge_definition(self, name, purge=False):
+    def delete_edge_collection(self, name, purge=False):
         """Remove the specified edge definition from the graph.
 
         :param name: the name of the edge definition (collection)
