@@ -4,7 +4,7 @@ import pytest
 from six import string_types
 
 from arango import ArangoClient
-from arango.constants import COLLECTION_STATUSES
+from arango.collection import Collection
 from arango.exceptions import *
 from arango.tests.utils import (
     generate_db_name,
@@ -17,7 +17,7 @@ db_name = generate_db_name(arango_client)
 db = arango_client.create_database(db_name)
 ecol_name = generate_col_name(db)
 ecol = db.create_collection(ecol_name, edge=True)
-ecol.add_geo_index(['coordinates'])
+ecol.create_geo_index(['coordinates'])
 
 # Set up test collection and edges
 col = generate_col_name(db)
@@ -46,7 +46,7 @@ def test_properties():
 def test_options():
     options = ecol.properties()
     assert 'id' in options
-    assert options['status'] in COLLECTION_STATUSES.values()
+    assert options['status'] in Collection.STATUSES.values()
     assert options['name'] == ecol_name
     assert options['edge'] == True
     assert options['system'] == False
@@ -130,7 +130,7 @@ def test_checksum():
     assert ecol.checksum(revision=False, data=False) == 0
     assert ecol.checksum(revision=False, data=True) == 0
 
-    ecol.insert(edge1)
+    ecol.insert_one(edge1)
     assert ecol.checksum(revision=True, data=False) > 0
     assert ecol.checksum(revision=True, data=True) > 0
     assert ecol.checksum(revision=False, data=False) > 0
@@ -138,8 +138,8 @@ def test_checksum():
 
 
 def test_truncate():
-    ecol.insert(edge1)
-    ecol.insert(edge2)
+    ecol.insert_one(edge1)
+    ecol.insert_one(edge2)
     assert len(ecol) > 1
 
     result = ecol.truncate()
@@ -149,7 +149,7 @@ def test_truncate():
 
 def test_insert():
     assert '1' not in ecol
-    edge = ecol.insert(edge1)
+    edge = ecol.insert_one(edge1)
     assert edge['_key'] == '1'
     assert '1' in ecol
     assert len(ecol) == 1
@@ -160,7 +160,7 @@ def test_insert():
     assert edge['_to'] == edge1['_to']
 
     assert '2' not in ecol
-    edge = ecol.insert(edge2, sync=True)
+    edge = ecol.insert_one(edge2, sync=True)
     assert edge['_key'] == '2'
     assert '2' in ecol
     assert len(ecol) == 2
@@ -171,10 +171,10 @@ def test_insert():
     assert edge['_to'] == edge2['_to']
 
     with pytest.raises(DocumentInsertError):
-        ecol.insert(edge1)
+        ecol.insert_one(edge1)
 
     with pytest.raises(DocumentInsertError):
-        ecol.insert(edge2)
+        ecol.insert_one(edge2)
 
 
 def test_insert_many():
@@ -203,7 +203,7 @@ def test_insert_many():
 
 
 def test_get():
-    ecol.insert(edge1)
+    ecol.insert_one(edge1)
     edge = ecol.get('1')
     assert edge['_key'] == '1'
     assert edge['_from'] == edge1['_from']
@@ -234,28 +234,28 @@ def test_get_many():
 
 
 def test_update():
-    ecol.insert(edge1)
-    edge = ecol.update('1', {'value': 200})
+    ecol.insert_one(edge1)
+    edge = ecol.update_one('1', {'value': 200})
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] == 200
 
-    edge = ecol.update('1', {'value': None}, keep_none=True)
+    edge = ecol.update_one('1', {'value': None}, keep_none=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] is None
 
-    edge = ecol.update('1', {'value': {'bar': 1}}, sync=True)
+    edge = ecol.update_one('1', {'value': {'bar': 1}}, sync=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] == {'bar': 1}
 
-    edge = ecol.update('1', {'value': {'baz': 2}}, merge=True)
+    edge = ecol.update_one('1', {'value': {'baz': 2}}, merge=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] == {'bar': 1, 'baz': 2}
 
-    edge = ecol.update('1', {'value': None}, keep_none=False)
+    edge = ecol.update_one('1', {'value': None}, keep_none=False)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert 'value' not in ecol['1']
@@ -264,22 +264,22 @@ def test_update():
     new_rev = str(int(old_rev) + 1)
 
     with pytest.raises(DocumentRevisionError):
-        ecol.update('1', {'value': 300, '_rev': new_rev})
+        ecol.update_one('1', {'value': 300, '_rev': new_rev})
     assert 'value' not in ecol['1']
 
     with pytest.raises(DocumentUpdateError):
-        ecol.update('2', {'value': 300})
+        ecol.update_one('2', {'value': 300})
     assert 'value' not in ecol['1']
 
-    ecol.update('1', {'_to': '{}/3'.format(col)})
+    ecol.update_one('1', {'_to': '{}/3'.format(col)})
     assert ecol['1']['_to'] == '{}/3'.format(col)
 
-    ecol.update('1', {'_from': '{}/2'.format(col)})
+    ecol.update_one('1', {'_from': '{}/2'.format(col)})
     assert ecol['1']['_from'] == '{}/2'.format(col)
 
 
 def test_replace():
-    ecol.insert(edge1)
+    ecol.insert_one(edge1)
     new_data = {
         '_from': edge1['_from'],
         '_to': edge1['_to'],
@@ -570,7 +570,7 @@ def test_find_near():
 
 
 def test_find_in_range():
-    ecol.add_skiplist_index(['value'])
+    ecol.create_skiplist_index(['value'])
     e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
     e1['value'], e2['value'], e3['value'], e4['value'] = 1, 2, 3, 4
     inserted = [e1, e2, e3, e4]
@@ -581,7 +581,7 @@ def test_find_in_range():
         upper=4,
         offset=1,
         limit=2,
-        include=True
+        inclusive=True
     )
     assert clean_keys(list(result)) == [e3, e4]
 
@@ -637,7 +637,7 @@ def test_find_in_square():
 
 
 def test_find_text():
-    ecol.add_fulltext_index(['text'])
+    ecol.create_fulltext_index(['text'])
     e1, e2, e3 = edge1.copy(), edge2.copy(), edge3.copy()
     e1['text'] = 'foo'
     e2['text'] = 'bar'
@@ -645,16 +645,16 @@ def test_find_text():
     inserted = [e1, e2, e3]
     ecol.insert_many(inserted)
     result = ecol.find_text(
-        field='text', query='foo,|bar'
+        key='text', query='foo,|bar'
     )
     assert clean_keys(list(result)) == [e1, e2]
 
     # Bad parameter
     with pytest.raises(DocumentFindTextError):
-        ecol.find_text(field='text', query='+')
+        ecol.find_text(key='text', query='+')
 
     with pytest.raises(DocumentFindTextError):
-        ecol.find_text(field='text', query='|')
+        ecol.find_text(key='text', query='|')
 
 
 def test_list_indexes():
@@ -665,13 +665,13 @@ def test_list_indexes():
         'fields': ['_key'],
         'unique': True
     }
-    indexes = ecol.indexes()
+    indexes = ecol.list_indexes()
     assert isinstance(indexes, dict)
     assert expected_index in indexes.values()
 
 
 def test_add_hash_index():
-    ecol.add_hash_index(['attr1', 'attr2'], unique=True)
+    ecol.create_hash_index(['attr1', 'attr2'], unique=True)
     expected_index = {
         'selectivity': 1,
         'sparse': False,
@@ -679,25 +679,25 @@ def test_add_hash_index():
         'fields': ['attr1', 'attr2'],
         'unique': True
     }
-    assert expected_index in ecol.indexes().values()
+    assert expected_index in ecol.list_indexes().values()
 
 
 def test_add_skiplist_index():
-    ecol.add_skiplist_index(['attr1', 'attr2'], unique=True)
+    ecol.create_skiplist_index(['attr1', 'attr2'], unique=True)
     expected_index = {
         'sparse': False,
         'type': 'skiplist',
         'fields': ['attr1', 'attr2'],
         'unique': True
     }
-    assert expected_index in ecol.indexes().values()
+    assert expected_index in ecol.list_indexes().values()
 
 
 def test_add_geo_index():
     # With one attribute
-    ecol.add_geo_index(
+    ecol.create_geo_index(
         fields=['attr1'],
-        geo_json=False,
+        ordered=False,
     )
     expected_index = {
         'sparse': True,
@@ -708,12 +708,12 @@ def test_add_geo_index():
         'ignore_none': True,
         'constraint': False
     }
-    assert expected_index in ecol.indexes().values()
+    assert expected_index in ecol.list_indexes().values()
 
     # With two attributes
-    ecol.add_geo_index(
+    ecol.create_geo_index(
         fields=['attr1', 'attr2'],
-        geo_json=False,
+        ordered=False,
     )
     expected_index = {
         'sparse': True,
@@ -723,21 +723,21 @@ def test_add_geo_index():
         'ignore_none': True,
         'constraint': False
     }
-    assert expected_index in ecol.indexes().values()
+    assert expected_index in ecol.list_indexes().values()
 
     # With more than two attributes (should fail)
     with pytest.raises(IndexCreateError):
-        ecol.add_geo_index(fields=['attr1', 'attr2', 'attr3'])
+        ecol.create_geo_index(fields=['attr1', 'attr2', 'attr3'])
 
 
 def test_add_fulltext_index():
     # With two attributes (should fail)
     with pytest.raises(IndexCreateError):
-        ecol.add_fulltext_index(fields=['attr1', 'attr2'])
+        ecol.create_fulltext_index(fields=['attr1', 'attr2'])
 
-    ecol.add_fulltext_index(
+    ecol.create_fulltext_index(
         fields=['attr1'],
-        min_length=10,
+        minimum_length=10,
     )
     expected_index = {
         'sparse': True,
@@ -746,18 +746,18 @@ def test_add_fulltext_index():
         'min_length': 10,
         'unique': False,
     }
-    assert expected_index in ecol.indexes().values()
+    assert expected_index in ecol.list_indexes().values()
 
 
 def test_delete_index():
-    old_indexes = set(ecol.indexes())
-    ecol.add_hash_index(['attr1', 'attr2'], unique=True)
-    ecol.add_skiplist_index(['attr1', 'attr2'], unique=True)
-    ecol.add_fulltext_index(fields=['attr1'], min_length=10)
+    old_indexes = set(ecol.list_indexes())
+    ecol.create_hash_index(['attr1', 'attr2'], unique=True)
+    ecol.create_skiplist_index(['attr1', 'attr2'], unique=True)
+    ecol.create_fulltext_index(fields=['attr1'], minimum_length=10)
 
-    new_indexes = set(ecol.indexes())
+    new_indexes = set(ecol.list_indexes())
     assert new_indexes.issuperset(old_indexes)
 
     for index_id in new_indexes - old_indexes:
         ecol.delete_index(index_id)
-    assert set(ecol.indexes()) == old_indexes
+    assert set(ecol.list_indexes()) == old_indexes

@@ -1,34 +1,44 @@
 """ArangoDB Exceptions."""
 
+from arango.response import Response
+
 
 class ArangoError(Exception):
     """Base class for ArangoDB request errors.
 
-    :param response: the response object
-    :type response: arango.response.Response
+    :param response: the response object or string
+    :type response: arango.response.Response | str
     """
 
     def __init__(self, response):
-        # Get the ArangoDB error message if given
-        if response.body is not None and "errorMessage" in response.body:
-            message = response.body["errorMessage"]
-        elif response.status_text is not None:
-            message = response.status_text
-        else:
-            message = "request failed"
+        if isinstance(response, Response):
+            # Get the ArangoDB error message if given
+            if response.body is not None and "errorMessage" in response.body:
+                message = response.body["errorMessage"]
+            elif response.status_text is not None:
+                message = response.status_text
+            else:
+                message = "request failed"
 
-        # Get the ArangoDB error number if given
-        if response.body is not None and "errorNum" in response.body:
-            self.error_code = response.body["errorNum"]
+            # Get the ArangoDB error number if given
+            if response.body is not None and "errorNum" in response.body:
+                self.error_code = response.body["errorNum"]
+            else:
+                self.error_code = None
+
+            # Generate the error message for the exception
+            super(ArangoError, self).__init__(message)
+            self.message = message
+            self.method = response.method
+            self.url = response.url
+            self.http_code = response.status_code
         else:
+            super(ArangoError, self).__init__(response)
+            self.message = response
             self.error_code = None
-
-        # Generate the error message for the exception
-        super(ArangoError, self).__init__(message)
-        self.message = message
-        self.method = response.method
-        self.url = response.url
-        self.http_code = response.status_code
+            self.method = None
+            self.url = None
+            self.http_code = None
 
 
 class ServerConnectionError(ArangoError):
@@ -122,7 +132,7 @@ class DatabaseListError(ArangoError):
     """Failed to get the list of databases."""
 
 
-class DatabaseOptionsGetError(ArangoError):
+class DatabasePropertiesGetError(ArangoError):
     """Failed to get the database options."""
 
 
@@ -191,6 +201,10 @@ class CollectionGetCountError(ArangoError):
     """Failed to get the count of the documents in the collections."""
 
 
+class CollectionContainsError(ArangoError):
+    """Failed to check whether a collection contains a document."""
+
+
 class CollectionGetPropertiesError(ArangoError):
     """Failed to get the collection properties."""
 
@@ -215,7 +229,7 @@ class CollectionCreateError(ArangoError):
     """Failed to create the collection."""
 
 
-class CollectionDropError(ArangoError):
+class CollectionDeleteError(ArangoError):
     """Failed to delete the collection"""
 
 
@@ -241,6 +255,10 @@ class CollectionUnloadError(ArangoError):
 
 class CollectionRotateError(ArangoError):
     """Failed to rotate the journal of the collection."""
+
+
+class CollectionUnknownStatusError(ArangoError):
+    """Unknown status was returned from the collection."""
 
 
 ########################################
@@ -431,7 +449,7 @@ class AQLFunctionDeleteError(ArangoError):
 ###########################
 
 
-class DocumentFindManyError(ArangoError):
+class DocumentFindError(ArangoError):
     """Failed to execute the ``by-example`` simple query."""
 
 
@@ -459,7 +477,7 @@ class DocumentGetLastError(ArangoError):
     """Failed to execute the ``last`` simple query."""
 
 
-class DocumentGetAllError(ArangoError):
+class DocumentIterateError(ArangoError):
     """Failed to execute the `all`` simple query."""
 
 
@@ -530,7 +548,7 @@ class GraphCreateError(ArangoError):
     """Failed to create the graph."""
 
 
-class GraphDropError(ArangoError):
+class GraphDeleteError(ArangoError):
     """Failed to delete the graph."""
 
 

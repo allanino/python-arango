@@ -10,8 +10,7 @@ from arango.exceptions import (
 class Cursor(object):
     """ArangoDB cursor object.
 
-    Fetches documents from the server cursor in batches. The ``init_data`` is
-    the response body of the create cursor API call.
+    Fetches documents from the server cursor in batches.
 
     :param connection: ArangoDB connection object
     :type connection: arango.connection.Connection

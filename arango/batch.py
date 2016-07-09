@@ -13,11 +13,11 @@ class BatchExecution(Connection):
     """ArangoDB batch execution object.
 
     API requests via BatchExecution are placed in an in-memory queue inside
-    the object and committed as a whole in a single HTTP call.
+    the object and committed as a whole in a single call.
 
     If ``return_result`` is set to True, a BatchJob instance is returned each
-    time a request is queued. The BatchJob object can be used to retrieve the
-    result of the corresponding request after execution.
+    time a request is issued. The BatchJob object can be used to retrieve the
+    result of the corresponding request after the commit.
 
     :param connection: ArangoDB database connection object
     :type connection: arango.connection.Connection
@@ -135,9 +135,9 @@ class BatchExecution(Connection):
                         body=raw_body
                     ))
                 except Exception as err:
-                    job.update(status=BatchJob.Status.ERROR, exception=err)
+                    job.update_one(status=BatchJob.Status.ERROR, exception=err)
                 else:
-                    job.update(status=BatchJob.Status.DONE, result=result)
+                    job.update_one(status=BatchJob.Status.DONE, result=result)
         finally:
             self._requests, self._handlers, self._batch_jobs = [], [], []
 

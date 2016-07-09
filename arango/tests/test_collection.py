@@ -4,7 +4,7 @@ import pytest
 from six import string_types
 
 from arango import ArangoClient
-from arango.constants import COLLECTION_STATUSES
+from arango.collection import Collection
 from arango.exceptions import *
 from arango.tests.utils import (
     generate_db_name,
@@ -17,7 +17,7 @@ db_name = generate_db_name(arango_client)
 db = arango_client.create_database(db_name)
 col_name = generate_col_name(db)
 col = db.create_collection(col_name)
-col.add_geo_index(['coordinates'])
+col.create_geo_index(['coordinates'])
 
 
 def teardown_module(*_):
@@ -38,7 +38,7 @@ def test_properties():
 def test_options():
     options = col.properties()
     assert 'id' in options
-    assert options['status'] in COLLECTION_STATUSES.values()
+    assert options['status'] in Collection.STATUSES.values()
     assert options['name'] == col_name
     assert options['edge'] == False
     assert options['system'] == False
@@ -126,7 +126,7 @@ def test_checksum():
     assert col.checksum(revision=False, data=False) == 0
     assert col.checksum(revision=False, data=True) == 0
 
-    col.insert({'foo': 'bar'})
+    col.insert_one({'foo': 'bar'})
     assert col.checksum(revision=True, data=False) > 0
     assert col.checksum(revision=True, data=True) > 0
     assert col.checksum(revision=False, data=False) > 0
@@ -134,8 +134,8 @@ def test_checksum():
 
 
 def test_truncate():
-    col.insert({'foo': 'bar'})
-    col.insert({'foo': 'bar'})
+    col.insert_one({'foo': 'bar'})
+    col.insert_one({'foo': 'bar'})
     assert len(col) > 1
 
     result = col.truncate()
@@ -145,7 +145,7 @@ def test_truncate():
 
 def test_insert():
     for i in range(1, 6):
-        doc = col.insert({'_key': str(i), 'foo': i * 100})
+        doc = col.insert_one({'_key': str(i), 'foo': i * 100})
         assert doc['_id'] == '{}/{}'.format(col.name, str(i))
         assert doc['_key'] == str(i)
 
@@ -157,12 +157,12 @@ def test_insert():
         assert document['foo'] == key * 100
 
     assert '6' not in col
-    col.insert({'_key': '6', 'foo': 200}, sync=True)
+    col.insert_one({'_key': '6', 'foo': 200}, sync=True)
     assert '6' in col
     assert col.get('6')['foo'] == 200
 
     with pytest.raises(DocumentInsertError):
-        col.insert({'_key': '1', 'foo': 300})
+        col.insert_one({'_key': '1', 'foo': 300})
     assert col['1']['foo'] == 100
 
 
@@ -209,7 +209,7 @@ def test_insert_many():
 
 
 def test_get():
-    col.insert({'_key': '1', 'foo': 100})
+    col.insert_one({'_key': '1', 'foo': 100})
     doc = col.get('1')
     assert doc['foo'] == 100
 
@@ -245,30 +245,30 @@ def test_get_many():
 
 
 def test_update():
-    col.insert({'_key': '1', 'foo': 100})
+    col.insert_one({'_key': '1', 'foo': 100})
     assert col['1']['foo'] == 100
 
-    doc = col.update('1', {'foo': 200})
+    doc = col.update_one('1', {'foo': 200})
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == 200
 
-    doc = col.update('1', {'foo': None}, keep_none=True)
+    doc = col.update_one('1', {'foo': None}, keep_none=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] is None
     
-    doc = col.update('1', {'foo': {'bar': 1}}, sync=True)
+    doc = col.update_one('1', {'foo': {'bar': 1}}, sync=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == {'bar': 1}
 
-    doc = col.update('1', {'foo': {'baz': 2}}, merge=True)
+    doc = col.update_one('1', {'foo': {'baz': 2}}, merge=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == {'bar': 1, 'baz': 2}
 
-    doc = col.update('1', {'foo': None}, keep_none=False)
+    doc = col.update_one('1', {'foo': None}, keep_none=False)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert 'foo' not in col['1']
@@ -277,16 +277,16 @@ def test_update():
     new_rev = str(int(old_rev) + 1)
 
     with pytest.raises(DocumentRevisionError):
-        col.update('1', {'foo': 300, '_rev': new_rev})
+        col.update_one('1', {'foo': 300, '_rev': new_rev})
     assert 'foo' not in col['1']
 
     with pytest.raises(DocumentUpdateError):
-        col.update('2', {'foo': 300})
+        col.update_one('2', {'foo': 300})
     assert 'foo' not in col['1']
 
 
 def test_replace():
-    doc = col.insert({'_key': '1', 'foo': 100})
+    doc = col.insert_one({'_key': '1', 'foo': 100})
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == 100
@@ -395,7 +395,7 @@ def test_all():
         {'_key': '5', 'foo': 500},
     ]
     for doc in inserted:
-        col.insert(doc)
+        col.insert_one(doc)
     fetched = list(col.all())
     assert len(fetched) == len(inserted)
     for doc in fetched:
@@ -575,7 +575,7 @@ def test_find_near():
 
 
 def test_find_in_range():
-    col.add_skiplist_index(['value'])
+    col.create_skiplist_index(['value'])
     col.insert_many([
         {'_key': '1', 'value': 1},
         {'_key': '2', 'value': 2},
@@ -655,14 +655,14 @@ def test_find_in_rectangle():
 
 
 def test_find_text():
-    col.add_fulltext_index(['text'])
+    col.create_fulltext_index(['text'])
     col.insert_many([
         {'_key': '1', 'text': 'foo'},
         {'_key': '2', 'text': 'bar'},
         {'_key': '3', 'text': 'baz'}
     ])
     result = col.find_text(
-        field='text', query='foo,|bar'
+        key='text', query='foo,|bar'
     )
     expected = [
         {'_key': '1', 'text': 'foo'},
@@ -672,10 +672,10 @@ def test_find_text():
 
     # Bad parameter
     with pytest.raises(DocumentFindTextError):
-        col.find_text(field='text', query='+')
+        col.find_text(key='text', query='+')
 
     with pytest.raises(DocumentFindTextError):
-        col.find_text(field='text', query='|')
+        col.find_text(key='text', query='|')
 
 
 def test_list_indexes():
@@ -686,13 +686,13 @@ def test_list_indexes():
         'fields': ['_key'],
         'unique': True
     }
-    indexes = col.indexes()
+    indexes = col.list_indexes()
     assert isinstance(indexes, dict)
     assert expected_index in indexes.values()
 
 
 def test_add_hash_index():
-    col.add_hash_index(['attr1', 'attr2'], unique=True)
+    col.create_hash_index(['attr1', 'attr2'], unique=True)
     expected_index = {
         'selectivity': 1,
         'sparse': False,
@@ -700,25 +700,25 @@ def test_add_hash_index():
         'fields': ['attr1', 'attr2'],
         'unique': True
     }
-    assert expected_index in col.indexes().values()
+    assert expected_index in col.list_indexes().values()
 
 
 def test_add_skiplist_index():
-    col.add_skiplist_index(['attr1', 'attr2'], unique=True)
+    col.create_skiplist_index(['attr1', 'attr2'], unique=True)
     expected_index = {
         'sparse': False,
         'type': 'skiplist',
         'fields': ['attr1', 'attr2'],
         'unique': True
     }
-    assert expected_index in col.indexes().values()
+    assert expected_index in col.list_indexes().values()
 
 
 def test_add_geo_index():
     # With one attribute
-    col.add_geo_index(
+    col.create_geo_index(
         fields=['attr1'],
-        geo_json=False,
+        ordered=False,
     )
     expected_index = {
         'sparse': True,
@@ -729,12 +729,12 @@ def test_add_geo_index():
         'ignore_none': True,
         'constraint': False
     }
-    assert expected_index in col.indexes().values()
+    assert expected_index in col.list_indexes().values()
 
     # With two attributes
-    col.add_geo_index(
+    col.create_geo_index(
         fields=['attr1', 'attr2'],
-        geo_json=False,
+        ordered=False,
     )
     expected_index = {
         'sparse': True,
@@ -744,21 +744,21 @@ def test_add_geo_index():
         'ignore_none': True,
         'constraint': False
     }
-    assert expected_index in col.indexes().values()
+    assert expected_index in col.list_indexes().values()
 
     # With more than two attributes (should fail)
     with pytest.raises(IndexCreateError):
-        col.add_geo_index(fields=['attr1', 'attr2', 'attr3'])
+        col.create_geo_index(fields=['attr1', 'attr2', 'attr3'])
 
 
 def test_add_fulltext_index():
     # With two attributes (should fail)
     with pytest.raises(IndexCreateError):
-        col.add_fulltext_index(fields=['attr1', 'attr2'])
+        col.create_fulltext_index(fields=['attr1', 'attr2'])
 
-    col.add_fulltext_index(
+    col.create_fulltext_index(
         fields=['attr1'],
-        min_length=10,
+        minimum_length=10,
     )
     expected_index = {
         'sparse': True,
@@ -767,18 +767,18 @@ def test_add_fulltext_index():
         'min_length': 10,
         'unique': False,
     }
-    assert expected_index in col.indexes().values()
+    assert expected_index in col.list_indexes().values()
 
 
 def test_delete_index():
-    old_indexes = set(col.indexes())
-    col.add_hash_index(['attr1', 'attr2'], unique=True)
-    col.add_skiplist_index(['attr1', 'attr2'], unique=True)
-    col.add_fulltext_index(fields=['attr1'], min_length=10)
+    old_indexes = set(col.list_indexes())
+    col.create_hash_index(['attr1', 'attr2'], unique=True)
+    col.create_skiplist_index(['attr1', 'attr2'], unique=True)
+    col.create_fulltext_index(fields=['attr1'], minimum_length=10)
 
-    new_indexes = set(col.indexes())
+    new_indexes = set(col.list_indexes())
     assert new_indexes.issuperset(old_indexes)
 
     for index_id in new_indexes - old_indexes:
         col.delete_index(index_id)
-    assert set(col.indexes()) == old_indexes
+    assert set(col.list_indexes()) == old_indexes

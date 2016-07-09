@@ -3,11 +3,7 @@ from __future__ import unicode_literals
 from arango.async import AsyncExecution
 from arango.batch import BatchExecution
 from arango.collection import Collection
-from arango.constants import (
-    HTTP_OK,
-    COLLECTION_STATUSES,
-    COLLECTION_TYPES
-)
+from arango.constants import HTTP_OK
 from arango.exceptions import *
 from arango.graph import Graph
 from arango.transaction import Transaction
@@ -15,11 +11,7 @@ from arango.query import Query
 
 
 class Database(object):
-    """Wrapper for ArangoDB's database-specific API which cover:
-
-    1. Database properties
-    2. Collection Management
-    3. Graph Management
+    """ArangoDB database object.
 
     :param connection: ArangoDB database connection object
     :type connection: arango.connection.Connection
@@ -30,12 +22,10 @@ class Database(object):
         self._query = Query(self._conn)
 
     def __repr__(self):
-        """Return a descriptive string of this instance."""
         return '<ArangoDB database "{}">'.format(self._conn.database)
 
     def __getitem__(self, name):
-        """Return the collection of the given name."""
-        return Collection(self._conn, name)
+        return self.collection(name)
 
     @property
     def name(self):
@@ -48,27 +38,64 @@ class Database(object):
 
     @property
     def query(self):
+        """Return the database query object.
+
+        AQL statements can be executed through this object.
+
+        :returns: the database query object
+        :rtype: arango.query.Query
+        """
         return self._query
 
     def async(self, return_result=True):
+        """Return the async execution object.
+
+        API requests via async execution objects are placed in a server-side,
+        in-memory task queue and executed asynchronously in a fire-and-forget
+        style.
+
+        If ``return_result`` is set to True, an AsyncJob instance is returned
+        each time a request is issued through the async execution objects.
+        AsyncJob objects can be used to keep track of the status of the request
+        and retrieve the result.
+
+        :param return_result: whether to store and return the result
+        :type return_result: bool
+        :return: the async execution object
+        :rtype: arango.async.AsyncExecution
+        """
         return AsyncExecution(self._conn, return_result)
 
     def batch(self, return_result=True):
+        """Return the batch execution object.
+
+        API requests via batch execution objects are placed in an in-memory
+        queue inside the object and committed as a whole in a single call.
+
+        If ``return_result`` is set to True, a BatchJob instance is returned
+        each time a request is issued. BatchJob objects can be used to retrieve
+        the result of the corresponding request after the commit.
+
+        :param return_result: whether to store and return the result
+        :type return_result: bool
+        :return: the batch execution object
+        rtype: arango.batch.BatchExecution
+        """
         return BatchExecution(self._conn, return_result)
 
     def transaction(self, return_result=True):
         return Transaction(self._conn, return_result)
 
-    def options(self):
-        """Return all properties of this database.
+    def properties(self):
+        """Return the database properties.
 
         :returns: the database properties
         :rtype: dict
-        :raises: DatabaseOptionsGetError
+        :raises: DatabasePropertiesGetError
         """
         res = self._conn.get('/_api/database/current')
         if res.status_code not in HTTP_OK:
-            raise DatabaseOptionsGetError(res)
+            raise DatabasePropertiesGetError(res)
         result = res.body['result']
         result['system'] = result.pop('isSystem')
         return result
@@ -77,8 +104,8 @@ class Database(object):
     # Collection Management #
     #########################
 
-    def collections(self):
-        """Return the names of the collections in this database.
+    def list_collections(self):
+        """Return the names of the collections in the database.
 
         :returns: the names of the collections
         :rtype: dict
@@ -91,59 +118,62 @@ class Database(object):
             col['name']: {
                 'id': col['id'],
                 'system': col['isSystem'],
-                'type': COLLECTION_TYPES[col['type']],
-                'status': COLLECTION_STATUSES[col['status']],
+                'type': Collection.TYPES[col['type']],
+                'status': Collection.STATUSES[col['status']],
             }
             for col in res.body['result']
         }
 
     def collection(self, name):
-        """Return the Collection object of the specified name.
+        """Return a collection object.
 
         :param name: the name of the collection
         :type name: str
-        :returns: the requested collection object
+        :returns: the collection object
         :rtype: arango.collection.Collection
-        :raises: TypeError
         """
         return Collection(self._conn, name)
+
+    def c(self, name):
+        """Alias for self.collection."""
+        return self.collection(name)
 
     def create_collection(self, name, sync=False, compact=True, system=False,
                           journal_size=None, edge=False, volatile=False,
                           user_keys=True, key_increment=None, key_offset=None,
                           key_generator="traditional", shard_fields=None,
                           shard_count=None):
-        """Create a new collection to this database.
+        """Create a collection.
 
-        :param name: name of the new collection
+        :param name: the name of the collection
         :type name: str
-        :param sync: wait for the create to sync to disk
+        :param sync: wait for operations to sync to disk
         :type sync: bool
-        :param compact: whether or not the collection is compacted
+        :param compact: compact the collection
         :type compact: bool
-        :param system: whether or not the collection is a system collection
+        :param system: the collection is a system collection
         :type system: bool
-        :param journal_size: the max size of the journal or datafile
+        :param journal_size: the max size of the journal
         :type journal_size: int
-        :param edge: whether or not the collection is an edge collection
+        :param edge: the collection is an edge collection
         :type edge: bool
-        :param volatile: whether or not the collection is in-memory only
+        :param volatile: the collection is in-memory only
         :type volatile: bool
-        :param key_generator: ``traditional`` or ``autoincrement``
+        :param key_generator: "traditional" or "autoincrement"
         :type key_generator: str
         :param user_keys: whether to allow users to supply keys
         :type user_keys: bool
-        :param key_increment: increment value for ``autoincrement`` generator
+        :param key_increment: the increment value (autoincrement only)
         :type key_increment: int
-        :param key_offset: initial offset value for ``autoincrement`` generator
+        :param key_offset: the offset value (autoincrement only)
         :type key_offset: int
         :param shard_fields: the field(s) used to determine the target shard
         :type shard_fields: list
         :param shard_count: the number of shards to create
         :type shard_count: int
         :raises: CollectionCreateError
-        :returns: the created collection
-        :rtype: Collection | EdgeCollection
+        :returns: the new collection object
+        :rtype: arango.collection.Collection
         """
         key_options = {
             'type': key_generator,
@@ -174,38 +204,45 @@ class Database(object):
             raise CollectionCreateError(res)
         return self.collection(name)
 
-    def drop_collection(self, name, ignore_missing=False):
-        """Drop the specified collection from this database.
+    def delete_collection(self, name, ignore_missing=False):
+        """Delete a collection.
 
         :param name: the name of the collection to delete
         :type name: str
-        :param ignore_missing: ignore HTTP 404
+        :param ignore_missing: do not raise if the collection is missing
         :type ignore_missing: bool
         :returns: whether the deletion was successful
         :rtype: bool
-        :raises: CollectionDropError
+        :raises: CollectionDeleteError
         """
         res = self._conn.delete('/_api/collection/{}'.format(name))
         if res.status_code not in HTTP_OK:
             if not (res.status_code == 404 and ignore_missing):
-                raise CollectionDropError(res)
+                raise CollectionDeleteError(res)
         return not res.body['error']
 
     ####################
     # Graph Management #
     ####################
 
-    def graphs(self):
-        """List all graphs in this database.
+    def list_graphs(self):
+        """List all graphs in the database.
 
-        :returns: the graphs in this database
+        :returns: the graphs in the database
         :rtype: dict
         :raises: GraphGetError
         """
         res = self._conn.get('/_api/gharial')
         if res.status_code not in HTTP_OK:
             raise GraphListError(res)
-        return [graph['_key'] for graph in res.body['graphs']]
+        return [
+            {
+                'name': graph['_key'],
+                'revision': graph['_rev'],
+                'edge_definitions': graph['edgeDefinitions'],
+                'orphan_collections': graph['orphan_collections']
+            } for graph in res.body['graphs']
+        ]
 
     def graph(self, name):
         """Return the Graph object of the specified name.
@@ -217,6 +254,10 @@ class Database(object):
         :raises: TypeError, GraphNotFound
         """
         return Graph(self._conn, name)
+
+    def g(self, name):
+        """Alias for self.graph."""
+        return self.graph(name)
 
     def create_graph(self, name, edge_definitions=None,
                      orphan_collections=None):
@@ -245,7 +286,7 @@ class Database(object):
             raise GraphCreateError(res)
         return Graph(self._conn, name)
 
-    def drop_graph(self, name, ignore_missing=False):
+    def delete_graph(self, name, ignore_missing=False):
         """Drop the graph of the given name from this database.
 
         :param name: the name of the graph to delete
@@ -254,10 +295,10 @@ class Database(object):
         :type ignore_missing: bool
         :returns: whether the drop was successful
         :rtype: bool
-        :raises: GraphDropError
+        :raises: GraphDeleteError
         """
         res = self._conn.delete('/_api/gharial/{}'.format(name))
         if res.status_code not in HTTP_OK:
             if not (res.status_code == 404 and ignore_missing):
-                raise GraphDropError(res)
+                raise GraphDeleteError(res)
         return not res.body['error']

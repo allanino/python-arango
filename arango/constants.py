@@ -1,19 +1,3 @@
-# Valid collection types
-COLLECTION_TYPES = {
-    2: 'document',
-    3: 'edge'
-}
-
-# Valid collection statuses
-COLLECTION_STATUSES = {
-    1: 'new',
-    2: 'unloaded',
-    3: 'loaded',
-    4: 'unloading',
-    5: 'deleted',
-    6: 'loading'
-}
-
 # HTTP OK status codes
 HTTP_OK = {
     200, '200',
@@ -24,15 +8,3 @@ HTTP_OK = {
     205, '205',
     206, '206',
 }
-
-# Logging levels
-LOG_LEVELS = {
-    'fatal': 0,
-    'error': 1,
-    'warning': 2,
-    'info': 3,
-    'debug': 4,
-}
-
-# Log sorting types
-LOG_SORTING_TYPES = {'asc', 'desc'}

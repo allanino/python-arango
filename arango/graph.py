@@ -17,8 +17,8 @@ class Graph(APIWrapper):
     """
 
     _internal_methods = {
-        'vertex_collection',
-        'edge_collection',
+        'vertex_collection', 'v',
+        'edge_collection', 'e',
         'name',
         'graph'
     }
@@ -39,6 +39,14 @@ class Graph(APIWrapper):
         """
         return self._name
 
+    def v(self, name):
+        """Alias for self.vertex_collection."""
+        return self.vertex_collection(name)
+
+    def e(self, name):
+        """Alias for self.edge_collection."""
+        return self.edge_collection(name)
+
     def vertex_collection(self, name):
         """Return the vertex collection."""
         return VertexCollection(self._conn, self._name, name)
@@ -47,7 +55,7 @@ class Graph(APIWrapper):
         """Return the edge collection."""
         return EdgeCollection(self._conn, self._name, name)
 
-    def options(self):
+    def properties(self):
         """Return the graph options.
 
         :returns: the graph options
@@ -74,7 +82,7 @@ class Graph(APIWrapper):
     # Vertex Collection Management #
     ################################
 
-    def orphan_collections(self):
+    def get_orphan_collections(self):
         """Return the orphan (vertex) collections of the graph.
 
         :returns: the names of the orphan collections
@@ -93,7 +101,7 @@ class Graph(APIWrapper):
 
         return request, handler
 
-    def vertex_collections(self):
+    def get_vertex_collections(self):
         """Return the vertex collections of the graph.
 
         :returns: the names of the vertex collections
@@ -162,7 +170,7 @@ class Graph(APIWrapper):
     # Edge Definition Management #
     ##############################
 
-    def edge_collections(self):
+    def get_edge_collections(self):
         """Return the edge collections/definitions of the graph.
 
         :returns: the edge collections/definitions of the graph
@@ -652,7 +660,7 @@ class EdgeCollection(BaseCollection):
 
         return request, handler
 
-    def get(self, filters):
+    def fetch_one(self, filters):
         """Fetch a document from the collection.
 
         :param filters:
@@ -688,7 +696,7 @@ class EdgeCollection(BaseCollection):
 
         return request, handler
 
-    def update(self, document, keep_none=True, sync=False):
+    def update_one(self, document, keep_none=True, sync=False):
         """Update an edge in the edge collection.
 
         If ``keep_none`` is set to True, then key with values None are
@@ -743,7 +751,7 @@ class EdgeCollection(BaseCollection):
 
         return request, handler
 
-    def replace(self, document, sync=None):
+    def replace_one(self, document, sync=None):
         """Replace a document in the collection.
 
         The ``document`` must contain the keys "_key", "_from" and "_to".
@@ -789,10 +797,10 @@ class EdgeCollection(BaseCollection):
 
         return request, handler
 
-    def delete(self, document, sync=None, ignore_missing=True):
-        """Delete a document from the collection.
+    def delete_one(self, document, sync=None, ignore_missing=False):
+        """Delete a document from the collection by its key.
 
-        The ``document`` must contain the key "_key".
+        The ``document`` must contain "_key".
 
         If the ``ignore_missing`` flag is set to True, the method simply
         returns when the target document is not found. If the flag is set
@@ -835,6 +843,6 @@ class EdgeCollection(BaseCollection):
                 raise DocumentDeleteError(res)
             elif res.status_code not in HTTP_OK:
                 raise DocumentDeleteError(res)
-            return not res.body['error']
+            return res.body
 
         return request, handler

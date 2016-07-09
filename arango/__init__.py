@@ -87,10 +87,6 @@ class ArangoClient(object):
         return self._password
 
     @property
-    def database(self):
-        return self._database
-
-    @property
     def client(self):
         return self._client
 
@@ -654,7 +650,7 @@ class ArangoClient(object):
     # Task Management #
     ###################
 
-    def tasks(self):
+    def list_tasks(self):
         """Return all server tasks that are currently active.
 
         :returns: server tasks that are currently active

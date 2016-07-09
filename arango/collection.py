@@ -3,40 +3,52 @@ from __future__ import absolute_import, unicode_literals
 import json
 
 from arango.cursor import Cursor
-from arango.constants import (
-    HTTP_OK,
-    COLLECTION_STATUSES
-)
+from arango.constants import HTTP_OK
 from arango.exceptions import *
 from arango.request import Request
 from arango.api import APIWrapper
 
 
 class BaseCollection(APIWrapper):
-    """Base class for ArangoDB collection-specific API endpoints.
+    """Base ArangoDB collection object.
 
     :param connection: ArangoDB connection object
     :type connection: arango.connection.Connection
     :param name: the name of the collection
     :type name: str
     """
+
+    TYPES = {
+        2: 'document',
+        3: 'edge'
+    }
+
+    STATUSES = {
+        1: 'new',
+        2: 'unloaded',
+        3: 'loaded',
+        4: 'unloading',
+        5: 'deleted',
+        6: 'loading'
+    }
+
     def __init__(self, connection, name):
         self._conn = connection
         self._name = name
 
     def __iter__(self):
-        """Iterate through all documents in the collection.
+        """Iterate through the documents in the collection.
 
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
-        :raises: DocumentGetAllError
+        :raises: DocumentIterateError
         """
         res = self._conn.put(
             endpoint='/_api/simple/all',
             data={'collection': self._name}
         )
         if res.status_code not in HTTP_OK:
-            raise DocumentGetAllError(res)
+            raise DocumentIterateError(res)
         return Cursor(self._conn, res.body)
 
     def __len__(self):
@@ -46,13 +58,15 @@ class BaseCollection(APIWrapper):
         :rtype: int
         :raises: CollectionGetCountError
         """
-        res = self._conn.get('/_api/collection/{}/count'.format(self._name))
+        res = self._conn.get(
+            '/_api/collection/{}/count'.format(self._name)
+        )
         if res.status_code not in HTTP_OK:
             raise CollectionGetCountError(res)
         return res.body['count']
 
     def __getitem__(self, key):
-        """Return the document of the given key from the collection.
+        """Return a document from the collection.
 
         :param key: the document key
         :type key: str
@@ -71,33 +85,38 @@ class BaseCollection(APIWrapper):
         return res.body
 
     def __contains__(self, key):
-        """Return True if the document exists in the collection, else False.
+        """Check whether a document is in the collection.
 
         :param key: the document key
         :type key: str
         :returns: True if the document exists, else False
         :rtype: bool
-        :raises: DocumentGetError
+        :raises: CollectionContainsError
         """
         res = self._conn.head(
             '/_api/document/{}/{}'.format(self._name, key)
         )
-        if res.status_code == 200:
+        if res.status_code in HTTP_OK:
             return True
         elif res.status_code == 404:
             return False
-        raise DocumentGetError(res)
+        raise CollectionContainsError(res)
 
-    @staticmethod
-    def _status(code):
-        """Return the collection status text.
+    def _status(self, code):
+        """Return the collection status.
 
         :param code: the status code
         :type code: int
         :returns: the status text
         :rtype: str
+        :raises: CollectionUnknownStatusError
         """
-        return COLLECTION_STATUSES.get(code, 'corrupted ({})'.format(code))
+        try:
+            return self.STATUSES[code]
+        except KeyError:
+            raise CollectionUnknownStatusError(
+                'received unknown status code {}'.format(code)
+            )
 
     @property
     def name(self):
@@ -113,8 +132,8 @@ class BaseCollection(APIWrapper):
 
         :param new_name: the new name for the collection
         :type new_name: str
-        :returns: whether the operation succeeded
-        :rtype: bool
+        :returns: the collection summary
+        :rtype: dict
         :raises: CollectionRenameError
         """
         request = Request(
@@ -127,7 +146,13 @@ class BaseCollection(APIWrapper):
             if res.status_code not in HTTP_OK:
                 raise CollectionRenameError(res)
             self._name = new_name
-            return True
+            return {
+                'id': res.body['id'],
+                'is_system': res.body['isSystem'],
+                'name': res.body['name'],
+                'status': self._status(res.body['status']),
+                'type': self.TYPES[res.body['type']]
+            }
 
         return request, handler
 
@@ -159,7 +184,7 @@ class BaseCollection(APIWrapper):
         return request, handler
 
     def revision(self):
-        """Return the collection revision (a.k.a. etag).
+        """Return the collection revision.
 
         :returns: the collection revision
         :rtype: str
@@ -220,8 +245,8 @@ class BaseCollection(APIWrapper):
         :type sync: bool | None
         :param journal_size: the journal size
         :type journal_size: int
-        :returns: whether the operation succeeded
-        :rtype: bool
+        :returns: the new collection properties
+        :rtype: dict
         :raises: CollectionSetPropertiesError
         """
         data = {}
@@ -239,7 +264,24 @@ class BaseCollection(APIWrapper):
         def handler(res):
             if res.status_code not in HTTP_OK:
                 raise CollectionSetPropertiesError(res)
-            return not res.body['error']
+            result = {
+                'id': res.body['id'],
+                'name': res.body['name'],
+                'edge': res.body['type'] == 3,
+                'sync': res.body['waitForSync'],
+                'status': self._status(res.body['status']),
+                'compact': res.body['doCompact'],
+                'system': res.body['isSystem'],
+                'volatile': res.body['isVolatile'],
+                'journal_size': res.body['journalSize'],
+                'keygen': res.body['keyOptions']['type'],
+                'user_keys': res.body['keyOptions']['allowUserKeys'],
+            }
+            if 'increment' in res.body['keyOptions']:
+                result['key_increment'] = res.body['keyOptions']['increment']
+            if 'offset' in res.body['keyOptions']:
+                result['key_offset'] = res.body['keyOptions']['offset']
+            return result
 
         return request, handler
 
@@ -325,10 +367,10 @@ class BaseCollection(APIWrapper):
         return request, handler
 
     def truncate(self):
-        """Delete all documents in the collection.
+        """Truncate the collection.
 
-        :returns: whether the operation succeeded
-        :rtype: bool
+        :returns: the collection summary
+        :rtype: dict
         :raises: CollectionTruncateError
         """
         request = Request(
@@ -339,7 +381,13 @@ class BaseCollection(APIWrapper):
         def handler(res):
             if res.status_code not in HTTP_OK:
                 raise CollectionTruncateError(res)
-            return not res.body['error']
+            return {
+                'id': res.body['id'],
+                'is_system': res.body['isSystem'],
+                'name': res.body['name'],
+                'status': self._status(res.body['status']),
+                'type': self.TYPES[res.body['type']]
+            }
 
         return request, handler
 
@@ -363,13 +411,13 @@ class BaseCollection(APIWrapper):
         return request, handler
 
     def has(self, key):
-        """Return True if the document exists in the collection, else False.
+        """Check if a document exists in the collection.
 
         :param key: the document key
         :type key: str
-        :returns: True if the document exists, else False
+        :returns: whether the document exists
         :rtype: bool
-        :raises: DocumentGetError
+        :raises: CollectionContainsError
         """
         request = Request(
             method='head',
@@ -381,7 +429,7 @@ class BaseCollection(APIWrapper):
                 return True
             elif res.status_code == 404:
                 return False
-            raise DocumentGetError(res)
+            raise CollectionContainsError(res)
 
         return request, handler
 
@@ -392,7 +440,7 @@ class BaseCollection(APIWrapper):
     # TODO look into this endpoint for better documentation and testing
     def export(self, flush=None, max_wait=None, count=None, batch_size=None,
                limit=None, ttl=None, restrict=None):
-        """"Export all documents from the collection using a cursor.
+        """"Export all documents from the collection.
 
         :param flush: trigger a WAL flush operation prior to the export
         :type flush: bool | None
@@ -408,7 +456,7 @@ class BaseCollection(APIWrapper):
         :type ttl: int | None
         :param restrict: object with fields to be excluded/included
         :type restrict: dict
-        :returns: document cursor
+        :returns: the document cursor
         :rtype: arango.cursor.Cursor
         :raises: DocumentsExportError
         """
@@ -457,7 +505,7 @@ class BaseCollection(APIWrapper):
         :type limit: int
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
-        :raises: DocumentGetAllError
+        :raises: DocumentIterateError
         """
         data = {'collection': self._name}
         if offset is not None:
@@ -473,7 +521,7 @@ class BaseCollection(APIWrapper):
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise DocumentGetAllError(res)
+                raise DocumentIterateError(res)
             return Cursor(self._conn, res.body)
 
         return request, handler
@@ -521,9 +569,9 @@ class BaseCollection(APIWrapper):
         return request, handler
 
     def find(self, filters, offset=None, limit=None):
-        """Return the matching documents given the offset and the limit.
+        """Return documents that match the given filters.
 
-        :param filters: the filters
+        :param filters: the document filters
         :type filters: dict
         :param offset: the number of documents to skip
         :type offset: int
@@ -531,7 +579,7 @@ class BaseCollection(APIWrapper):
         :type limit: int
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
-        :raises: DocumentFindManyError
+        :raises: DocumentFindError
         """
         data = {'collection': self._name, 'example': filters}
         if offset is not None:
@@ -547,19 +595,20 @@ class BaseCollection(APIWrapper):
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise DocumentFindManyError(res)
+                raise DocumentFindError(res)
             return Cursor(self._conn, res.body)
 
         return request, handler
 
     def find_near(self, latitude, longitude, limit=None):
-        """Return all documents near the given coordinate.
+        """Return documents near a given coordinate.
 
-        By default at most 100 documents near the coordinate are returned.
+        By default, at most 100 documents near the coordinate are returned.
         Documents returned are sorted according to distance, with the nearest
         document being the first. If there are documents of equal distance,
         they are be randomly chosen from the set until the limit is reached.
-        A geo index must be defined in the collection to use this method.
+        A geo index must be defined in the collection for this method to be
+        used.
 
         :param latitude: the latitude
         :type latitude: int
@@ -598,13 +647,11 @@ class BaseCollection(APIWrapper):
         return request, handler
 
     def find_in_range(self, field, lower, upper, offset=0, limit=100,
-                      include=True):
-        """Return all documents within the given range.
+                      inclusive=True):
+        """Return documents within a given range.
 
-        The returned documents are ordered randomly. If ``distance_field`` is
-        specified, the distance between the coordinate and the documents are
-        returned using the argument value as the field name. A geo index must
-        be defined in the collection to use this method.
+        The returned documents are ordered randomly. A geo index must be
+        be defined in the collection for this method to be used.
 
         :param field: the name of the field to use
         :type field: str
@@ -616,13 +663,13 @@ class BaseCollection(APIWrapper):
         :type offset: int | None
         :param limit: the maximum number of documents to return
         :type limit: int | None
-        :param include: whether to include the endpoints
-        :type include: bool
+        :param inclusive: whether to include the lower and upper bounds
+        :type inclusive: bool
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
         :raises: DocumentFindInRangeError
         """
-        if include:
+        if inclusive:
             full_query = """
             FOR doc IN @@collection
                 FILTER doc.@field >= @lower && doc.@field <= @upper
@@ -659,13 +706,11 @@ class BaseCollection(APIWrapper):
         return request, handler
 
     # TODO the WITHIN geo function does not seem to work properly
-    def find_in_radius(self, latitude, longitude, radius, distance_field=None):
-        """Return all documents within the given radius.
+    def find_in_radius(self, latitude, longitude, radius, distance_key=None):
+        """Return documents within a given radius.
 
-        The returned documents are ordered randomly. If ``distance_field`` is
-        specified, the distance between the coordinate and the documents are
-        returned using the argument value as the field name. A geo index must
-        be defined in the collection to use this method.
+        The returned documents are ordered randomly. A geo index must be
+        defined in the collection to for this method to be used.
 
         :param latitude: the latitude
         :type latitude: int
@@ -673,16 +718,16 @@ class BaseCollection(APIWrapper):
         :type longitude: int
         :param radius: the maximum radius
         :type radius: int
-        :param distance_field: the name of the field containing the distance
-        :type distance_field: str
-        :returns: document cursor
+        :param distance_key: the key containing the distance
+        :type distance_key: str
+        :returns: the document cursor
         :rtype: arango.cursor.Cursor
         :raises: DocumentFindInRadiusError
         """
         full_query = """
         FOR doc IN WITHIN(@collection, @latitude, @longitude, @radius{})
             RETURN doc
-        """.format(', @distance' if distance_field is not None else '')
+        """.format(', @distance' if distance_key is not None else '')
 
         bind_vars = {
             'collection': self._name,
@@ -690,8 +735,8 @@ class BaseCollection(APIWrapper):
             'longitude': longitude,
             'radius': radius
         }
-        if distance_field is not None:
-            bind_vars['distance'] = distance_field
+        if distance_key is not None:
+            bind_vars['distance'] = distance_key
 
         request = Request(
             method='post',
@@ -708,27 +753,27 @@ class BaseCollection(APIWrapper):
 
     def find_in_box(self, latitude1, longitude1, latitude2, longitude2,
                     skip=None, limit=None, geo=None):
-        """Return all documents in a rectangle with the given coordinates.
+        """Return all documents in a square area.
 
-        A geo index must be defined in the collection to use this method. If
-        there are more than one geo index, the ``geo`` argument can be used to
-        select a particular one.
+        A geo index must be defined in the collection for this method to be
+        used. If there are more than one geo index, the ``geo`` argument can
+        be used to select a particular one.
 
-        :param latitude1: the latitude of the first rectangle coordinate
+        :param latitude1: the first latitude
         :type latitude1: int
-        :param longitude1: the longitude of the first rectangle coordinate
+        :param longitude1: the first longitude
         :type longitude1: int
-        :param latitude2: the latitude of the second rectangle coordinate
+        :param latitude2: the second latitude
         :type latitude2: int
-        :param longitude2: the longitude of the second rectangle coordinate
+        :param longitude2: the second longitude
         :type longitude2: int
         :param skip: the number of documents to skip
         :type skip: int
-        :param limit: maximum number of documents to return
+        :param limit: the maximum number of documents to return
         :type limit: int
         :param geo: the field to use (must have geo-index)
         :type geo: str
-        :returns: document cursor
+        :returns: the document cursor
         :rtype: arango.cursor.Cursor
         :raises: DocumentFindInRectangleError
         """
@@ -759,18 +804,16 @@ class BaseCollection(APIWrapper):
 
         return request, handler
 
-    def find_text(self, field, query, limit=None):
-        """Return all documents that match the specified fulltext ``query``.
+    def find_text(self, key, query, limit=None):
+        """Return documents that match the specified fulltext ``query``.
 
-        A geo index must be defined in the collection to use this method.
-
-        :param field: the attribute path with a fulltext index
-        :type field: str
+        :param key: the key with a fulltext index
+        :type key: str
         :param query: the fulltext query
         :type query: str
-        :param limit: maximum number of documents to return
+        :param limit: the maximum number of documents to return
         :type limit: int
-        :returns: document cursor
+        :returns: the document cursor
         :rtype: arango.cursor.Cursor
         :raises: DocumentFindTextError
         """
@@ -781,7 +824,7 @@ class BaseCollection(APIWrapper):
 
         bind_vars = {
             'collection': self._name,
-            'field': field,
+            'field': key,
             'query': query
         }
         if limit is not None:
@@ -804,7 +847,7 @@ class BaseCollection(APIWrapper):
     # Index Management #
     ####################
 
-    def indexes(self):
+    def list_indexes(self):
         """Return the collection indexes.
 
         :returns: the collection indexes
@@ -842,7 +885,7 @@ class BaseCollection(APIWrapper):
         return request, handler
 
     def _add_index(self, data):
-        """Helper method for creating new indexes."""
+        """Helper method for creating a new index."""
         request = Request(
             method='post',
             endpoint='/_api/index?collection={}'.format(self._name),
@@ -869,14 +912,14 @@ class BaseCollection(APIWrapper):
 
         return request, handler
 
-    def add_hash_index(self, fields, unique=None, sparse=None):
+    def create_hash_index(self, fields, unique=None, sparse=None):
         """Create a new hash index in the collection.
 
-        :param fields: the attribute paths to index
+        :param fields: the document fields to index
         :type fields: list
-        :param unique: whether or not the index is unique
+        :param unique: whether the index is unique
         :type unique: bool | None
-        :param sparse: whether to index attr values of null
+        :param sparse: whether to index None's
         :type sparse: bool | None
         :raises: IndexCreateError
         """
@@ -887,16 +930,16 @@ class BaseCollection(APIWrapper):
             data['sparse'] = sparse
         return self._add_index(data)
 
-    def add_skiplist_index(self, fields, unique=None, sparse=None):
+    def create_skiplist_index(self, fields, unique=None, sparse=None):
         """Create a new skiplist index in the collection.
 
         A skiplist index is used to find the ranges of documents (e.g. time).
 
-        :param fields: the fields to index
+        :param fields: the document fields to index
         :type fields: list
-        :param unique: whether or not the index is unique
+        :param unique: whether the index is unique
         :type unique: bool | None
-        :param sparse: whether to index attr values of null
+        :param sparse: whether to index None's
         :type sparse: bool | None
         :raises: IndexCreateError
         """
@@ -907,61 +950,51 @@ class BaseCollection(APIWrapper):
             data['sparse'] = sparse
         return self._add_index(data)
 
-    def add_geo_index(self, fields, geo_json=None, unique=None,
-                      ignore_none=None):
-        """Create a geo (geo-spatial) index in the collection
+    def create_geo_index(self, fields, ordered=None, unique=None):
+        """Create a geo-spatial index in the collection.
 
-        If ``fields`` is a list with one attribute path, then a geo-spatial
-        index on all documents is created using the value at the path as the
-        coordinate. The value must be a list with at least two doubles. The
-        list must contain the latitude (first value) and the longitude (second
-        value). All documents without the attribute paths or with invalid
-        values are ignored.
+        If ``fields`` only has one value, then a geo-spatial index is created
+        using the value the field as the coordinates. The value must be a list
+        with at least two doubles: latitude followed by a longitude. Documents
+        without the field or with invalid values are ignored.
 
-        If ``fields`` is a list with TWO attribute paths (i.e. latitude and
-        longitude, in that order) then a geo-spatial index on all documents is
-        created using the two attributes (again, their values must be doubles).
-        All documents without the attribute paths or with invalid values are
-        ignored.
+        If ``fields`` is a list with two values (i.e. a latitude followed by a
+        longitude) then a geo-spatial index is created using both. Documents
+        without the fields or with invalid values are ignored.
 
-        :param fields: the attribute paths to index (length must be <= 2)
+        :param fields: the document fields to index
         :type fields: list
-        :param geo_json: whether or not the order is longitude -> latitude
-        :type geo_json: bool | None
-        :param unique: whether or not to create a geo-spatial constraint
+        :param ordered: whether the order is longitude then latitude
+        :type ordered: bool | None
+        :param unique: whether the index is unique
         :type unique: bool | None
-        :param ignore_none: ignore docs with None in latitude/longitude
-        :type ignore_none: bool | None
         :raises: IndexCreateError
         """
         data = {'type': 'geo', 'fields': fields}
-        if geo_json is not None:
-            data['geoJson'] = geo_json
+        if ordered is not None:
+            data['geoJson'] = ordered
         if unique is not None:
             data['unique'] = unique
-        if ignore_none is not None:
-            data['ignore_null'] = ignore_none
         return self._add_index(data)
 
-    def add_fulltext_index(self, fields, min_length=None):
+    def create_fulltext_index(self, fields, minimum_length=None):
         """Create a fulltext index to the collection.
 
-        A fulltext index is used to find words or prefixes of words, and can
-        be set on one field only. Only words with textual values of minimum
-        length are indexed. Word tokenization is done using the word boundary
-        analysis provided by libicu, which uses the language selected during
-        server startup. Words are indexed in their lower-cased form. The index
-        supports complete match queries (full words) and prefix queries.
+        A fulltext index is used to find words or prefixes of words. Only words
+        with textual values of minimum length are indexed. Word tokenization is
+        done using the word boundary analysis provided by libicu, which uses
+        the language selected during server startup. Words are indexed in their
+        lower-cased form. The index supports complete match and prefix queries.
 
-        :param fields: the fields to index (length must be > 1)
+        :param fields: the field to index
         :type fields: list
-        :param min_length: minimum character length of words to index
-        :type min_length: int
+        :param minimum_length: the minimum number of characters to index
+        :type minimum_length: int
         :raises: IndexCreateError
         """
         data = {'type': 'fulltext', 'fields': fields}
-        if min_length is not None:
-            data['minLength'] = min_length
+        if minimum_length is not None:
+            data['minLength'] = minimum_length
         return self._add_index(data)
 
     def delete_index(self, index_id):
@@ -1040,7 +1073,7 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def insert(self, document, sync=None):
+    def insert_one(self, document, sync=None):
         """Insert a single document into the collection.
 
         If ``data`` contains the ``_key`` field, its value will be used as the
@@ -1115,8 +1148,8 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def update(self, key, data, rev=None, merge=True, keep_none=True,
-               sync=None):
+    def update_one(self, key, data, rev=None, merge=True, keep_none=True,
+                   sync=None):
         """Update the given document in the collection.
 
         If "_rev" field is present in ``data``, its value is compared against
@@ -1182,7 +1215,7 @@ class Collection(BaseCollection):
         :type filters: dict
         :param data: the new document body to update with
         :type data: dict
-        :param limit: maximum number of documents to return
+        :param limit: the maximum number of documents to return
         :type limit: int
         :param keep_none: whether or not to keep the None values
         :type keep_none: bool
@@ -1264,7 +1297,7 @@ class Collection(BaseCollection):
         return request, handler
 
     def find_and_replace(self, filters, data, limit=None, sync=False):
-        """Replace the matching documents.
+        """Replace matching documents.
 
         :param filters: the match filters
         :type filters: dict
@@ -1301,7 +1334,7 @@ class Collection(BaseCollection):
         return request, handler
 
     def delete(self, key, rev=None, sync=False, ignore_missing=True):
-        """Delete the specified document from the collection.
+        """Delete a document from the collection.
 
         :param key: the key of the document to be deleted
         :type key: str
@@ -1341,7 +1374,7 @@ class Collection(BaseCollection):
         return request, handler
 
     def delete_many(self, keys, sync=None):
-        """Remove all documents with the given keys.
+        """Delete documents whose keys are in ``keys``.
 
         :param keys: keys of documents to delete
         :type keys: list
@@ -1368,11 +1401,11 @@ class Collection(BaseCollection):
         return request, handler
 
     def find_and_delete(self, filters, limit=None, sync=None):
-        """Delete the matching documents from the collection.
+        """Delete matching documents from the collection.
 
         :param filters: the filters
         :type filters: dict
-        :param limit: the maximum number of documents to delete
+        :param limit: the the maximum number of documents to delete
         :type limit: int
         :param sync: wait for the operation to sync to disk
         :type sync: bool

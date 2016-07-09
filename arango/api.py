@@ -10,9 +10,10 @@ class APIWrapper(object):
 
     def __getattribute__(self, attr):
         method = object.__getattribute__(self, attr)
-        if attr.startswith('_') or attr in self._internal_methods:
-            return method
+        internal = object.__getattribute__(self, '_internal_methods')
 
+        if attr in internal or attr.startswith('_') or attr.isupper():
+            return method
         conn = object.__getattribute__(self, '_conn')
 
         @wraps(method)

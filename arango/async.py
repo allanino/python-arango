@@ -24,8 +24,8 @@ class AsyncExecution(Connection):
     queue and executed asynchronously in a fire-and-forget style.
 
     If ``return_result`` is set to True, an AsyncJob instance is returned each
-    time a request is queued. The AsyncJob object can be used to keep track of
-    the status of the request and retrieve the result when available.
+    time a request is issued. The AsyncJob object can be used to keep track of
+    the status of the request and retrieve the result.
 
     :param connection: ArangoDB database connection object
     :type connection: arango.connection.Connection

@@ -28,7 +28,7 @@ def generate_col_name(database):
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(database.collections())
+    existing = set(database.list_collections())
     while "test_collection_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_collection_{num:06d}".format(num=num)
@@ -43,7 +43,7 @@ def generate_graph_name(database):
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(database.graphs())
+    existing = set(database.list_graphs())
     while "test_graph_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_graph_{num:06d}".format(num=num)
@@ -58,7 +58,7 @@ def generate_task_name(client):
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(task['name'] for task in client.tasks().values())
+    existing = set(task['name'] for task in client.list_tasks().values())
     while "test_task_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_task_{num:06d}".format(num=num)

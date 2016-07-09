@@ -19,7 +19,7 @@ def test_wal_options():
 
 @pytest.mark.order2
 def test_wal_set_options():
-    wal.update(
+    wal.update_one(
         historic_logs=15,
         oversized_ops=False,
         log_size=30000000,

@@ -33,7 +33,7 @@ def test_properties():
 
 @pytest.mark.order1
 def test_options():
-    options = db.options()
+    options = db.properties()
     assert 'id' in options
     assert 'path' in options
     assert options['system'] == False
@@ -42,7 +42,7 @@ def test_options():
 
 @pytest.mark.order2
 def test_list_collections():
-    cols = db.collections()
+    cols = db.list_collections()
     assert all(c == col_name_1 or c.startswith('_') for c in cols)
 
 
@@ -96,22 +96,22 @@ def test_create_collection():
 @pytest.mark.order5
 def test_drop_collection():
     # Test drop collection
-    result = db.drop_collection(col_name_2)
+    result = db.delete_collection(col_name_2)
     assert result is True
-    assert col_name_2 not in db.collections()
+    assert col_name_2 not in db.list_collections()
 
     # Test drop missing collection
-    with pytest.raises(CollectionDropError):
-        db.drop_collection(col_name_2)
+    with pytest.raises(CollectionDeleteError):
+        db.delete_collection(col_name_2)
 
     # Test drop missing collection (ignore_missing)
-    result = db.drop_collection(col_name_2, ignore_missing=True)
+    result = db.delete_collection(col_name_2, ignore_missing=True)
     assert result is False
 
 
 @pytest.mark.order6
 def test_list_graphs():
-    assert db.graphs() == [graph_name]
+    assert db.list_graphs() == [graph_name]
 
 
 @pytest.mark.order7
@@ -129,20 +129,20 @@ def test_create_graph():
 
     new_graph_name = generate_graph_name(db)
     db.create_graph(new_graph_name)
-    assert new_graph_name in db.graphs()
+    assert new_graph_name in db.list_graphs()
 
 
 @pytest.mark.order9
 def test_drop_graph():
     # Test drop graph
-    result = db.drop_graph(graph_name)
+    result = db.delete_graph(graph_name)
     assert result is True
-    assert graph_name not in db.graphs()
+    assert graph_name not in db.list_graphs()
 
     # Test drop missing graph
-    with pytest.raises(GraphDropError):
-        db.drop_graph(graph_name)
+    with pytest.raises(GraphDeleteError):
+        db.delete_graph(graph_name)
 
     # Test drop missing graph (ignore_missing)
-    result = db.drop_graph(graph_name, ignore_missing=True)
+    result = db.delete_graph(graph_name, ignore_missing=True)
     assert result is False

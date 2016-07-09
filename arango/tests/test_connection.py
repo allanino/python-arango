@@ -278,7 +278,7 @@ def test_task_management():
     global task_id
 
     # Test get tasks
-    tasks = arango_client.tasks()
+    tasks = arango_client.list_tasks()
     assert isinstance(tasks, dict)
     for task in tasks.values():
         assert 'command' in task
@@ -288,7 +288,7 @@ def test_task_management():
         assert 'name' in task
 
     # Test get task
-    tasks = arango_client.tasks()
+    tasks = arango_client.list_tasks()
     if tasks:
         chosen_task_id = random.choice(list(tasks.keys()))
         retrieved_task = arango_client.task(chosen_task_id)
@@ -297,7 +297,7 @@ def test_task_management():
     cmd = "(function(params) { require('internal').print(params); })(params)"
 
     # Test create task
-    assert task_name not in arango_client.tasks()
+    assert task_name not in arango_client.list_tasks()
     task = arango_client.create_task(
         name=task_name,
         command=cmd,
@@ -306,8 +306,8 @@ def test_task_management():
         offset=3,
     )
     task_id = task['id']
-    assert task_id in arango_client.tasks()
-    assert task_name == arango_client.tasks()[task_id]['name']
+    assert task_id in arango_client.list_tasks()
+    assert task_name == arango_client.list_tasks()[task_id]['name']
 
     # Test get after create task
     task = arango_client.task(task_id)
@@ -329,7 +329,7 @@ def test_task_management():
     # Test delete task
     result = arango_client.delete_task(task['id'])
     assert result is True
-    assert task_id not in arango_client.tasks()
+    assert task_id not in arango_client.list_tasks()
 
     # Test delete missing task
     with pytest.raises(TaskDeleteError):
