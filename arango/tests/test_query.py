@@ -155,7 +155,7 @@ def test_get_query_cache_options():
 
 @pytest.mark.order7
 def test_set_query_cache_options():
-    options = db.query.cache.update_one(
+    options = db.query.cache.update(
         mode='on', limit=100
     )
     assert options['mode'] == 'on'

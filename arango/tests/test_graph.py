@@ -279,26 +279,26 @@ def test_insert_vertex():
     vertex2 = {'_key': '2', 'value': 2}
 
     assert '1' not in vcol
-    assert vcol.insert_one(vertex1)
+    assert vcol.insert(vertex1)
     assert '1' in vcol
     assert len(vcol) == 1
 
     # Test insert vertex into missing collection
     with pytest.raises(VertexInsertError):
-        assert vcol.insert_one('missing', vertex1)
+        assert vcol.insert('missing', vertex1)
 
     # Test insert duplicate vertex
     with pytest.raises(VertexInsertError):
-        assert vcol.insert_one(vertex1)
+        assert vcol.insert(vertex1)
 
     assert '2' not in vcol
-    assert vcol.insert_one(vertex2)
+    assert vcol.insert(vertex2)
     assert '2' in vcol
     assert len(vcol) == 2
 
     # Test insert duplicate vertex second time
     with pytest.raises(VertexInsertError):
-        assert vcol.insert_one(vertex2)
+        assert vcol.insert(vertex2)
 
 
 @pytest.mark.order11
@@ -327,10 +327,10 @@ def test_get_vertex():
 def test_update_vertex():
     vcol = graph.vertex_collection('vcol1')
     assert 'foo' not in vcol.get('1')
-    assert vcol.update_one('1', {'foo': 100})
+    assert vcol.update('1', {'foo': 100})
     assert vcol.get('1')['foo'] == 100
 
-    result = vcol.update_one('1', {'foo': 200, 'bar': 300})
+    result = vcol.update('1', {'foo': 200, 'bar': 300})
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result
     assert '_rev' in result
@@ -340,7 +340,7 @@ def test_update_vertex():
     assert result['bar'] == 300
     old_rev = result['_rev']
 
-    result = vcol.update_one('1', {'bar': 500}, rev=old_rev)
+    result = vcol.update('1', {'bar': 500}, rev=old_rev)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result
     assert '_rev' in result
@@ -349,21 +349,21 @@ def test_update_vertex():
 
     new_rev = str(int(old_rev) + 10)
     with pytest.raises(VertexRevisionError):
-        vcol.update_one('1', {'bar': 600}, rev=new_rev)
+        vcol.update('1', {'bar': 600}, rev=new_rev)
     assert vcol.get('1')['bar'] == 500
 
-    result = vcol.update_one('1', {'bar': 400}, sync=True)
+    result = vcol.update('1', {'bar': 400}, sync=True)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
     assert vcol.get('1')['foo'] == 200
     assert vcol.get('1')['bar'] == 400
 
-    result = vcol.update_one('1', {'bar': None}, keep_none=True)
+    result = vcol.update('1', {'bar': None}, keep_none=True)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
     assert vcol.get('1')['bar'] is None
 
-    result = vcol.update_one('1', {'foo': None}, keep_none=False)
+    result = vcol.update('1', {'foo': None}, keep_none=False)
     assert result['_id'] == 'vcol1/1'
     assert '_old_rev' in result and '_rev' in result
     assert vcol.get('1')['bar'] is None
@@ -416,9 +416,9 @@ def test_replace_vertex():
 def test_delete_vertex():
     vcol = graph.vertex_collection('vcol1')
     vcol.truncate()
-    vcol.insert_one({'_key': '1', 'value': 1})
-    vcol.insert_one({'_key': '2', 'value': 2})
-    vcol.insert_one({'_key': '3', 'value': 3})
+    vcol.insert({'_key': '1', 'value': 1})
+    vcol.insert({'_key': '2', 'value': 2})
+    vcol.insert({'_key': '3', 'value': 3})
 
     # Test vertex delete
     assert vcol.clear('1') == True

@@ -29,9 +29,9 @@ def test_batch_insert_context_manager_with_result():
     assert len(col) == 0
     with db.batch(return_result=True) as batch_db:
         batch_col = batch_db.collection(col_name)
-        batch_job1 = batch_col.insert_one({'_key': '1', 'val': 1})
-        batch_job2 = batch_col.insert_one({'_key': '2', 'val': 2})
-        batch_job3 = batch_col.insert_one({'_key': '2', 'val': 3})
+        batch_job1 = batch_col.insert({'_key': '1', 'val': 1})
+        batch_job2 = batch_col.insert({'_key': '2', 'val': 2})
+        batch_job3 = batch_col.insert({'_key': '2', 'val': 3})
 
     assert len(col) == 2
     assert col['1']['val'] == 1
@@ -54,9 +54,9 @@ def test_batch_insert_context_manager_without_result():
     assert len(col) == 0
     with db.batch(return_result=False) as batch:
         batch_col = batch.collection(col_name)
-        batch_job1 = batch_col.insert_one({'_key': '1', 'val': 1})
-        batch_job2 = batch_col.insert_one({'_key': '2', 'val': 2})
-        batch_job3 = batch_col.insert_one({'_key': '2', 'val': 3})
+        batch_job1 = batch_col.insert({'_key': '1', 'val': 1})
+        batch_job2 = batch_col.insert({'_key': '2', 'val': 2})
+        batch_job3 = batch_col.insert({'_key': '2', 'val': 3})
 
     assert len(col) == 2
     assert col['1']['val'] == 1
@@ -71,9 +71,9 @@ def test_batch_insert_no_context_manager_with_result():
     assert len(col) == 0
     batch = db.batch(return_result=True)
     batch_col = batch.collection(col_name)
-    batch_job1 = batch_col.insert_one({'_key': '1', 'val': 1})
-    batch_job2 = batch_col.insert_one({'_key': '2', 'val': 2})
-    batch_job3 = batch_col.insert_one({'_key': '2', 'val': 3})
+    batch_job1 = batch_col.insert({'_key': '1', 'val': 1})
+    batch_job2 = batch_col.insert({'_key': '2', 'val': 2})
+    batch_job3 = batch_col.insert({'_key': '2', 'val': 3})
 
     assert len(col) == 0
     assert batch_job1.status == BatchJob.Status.PENDING
@@ -110,9 +110,9 @@ def test_batch_insert_no_context_manager_without_result():
     assert len(col) == 0
     batch = db.batch(return_result=False)
     batch_col = batch.collection(col_name)
-    batch_job1 = batch_col.insert_one({'_key': '1', 'val': 1})
-    batch_job2 = batch_col.insert_one({'_key': '2', 'val': 2})
-    batch_job3 = batch_col.insert_one({'_key': '2', 'val': 3})
+    batch_job1 = batch_col.insert({'_key': '1', 'val': 1})
+    batch_job2 = batch_col.insert({'_key': '2', 'val': 2})
+    batch_job3 = batch_col.insert({'_key': '2', 'val': 3})
 
     assert batch_job1 is None
     assert batch_job2 is None

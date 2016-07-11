@@ -130,7 +130,7 @@ def test_checksum():
     assert ecol.checksum(revision=False, data=False) == 0
     assert ecol.checksum(revision=False, data=True) == 0
 
-    ecol.insert_one(edge1)
+    ecol.insert(edge1)
     assert ecol.checksum(revision=True, data=False) > 0
     assert ecol.checksum(revision=True, data=True) > 0
     assert ecol.checksum(revision=False, data=False) > 0
@@ -138,8 +138,8 @@ def test_checksum():
 
 
 def test_truncate():
-    ecol.insert_one(edge1)
-    ecol.insert_one(edge2)
+    ecol.insert(edge1)
+    ecol.insert(edge2)
     assert len(ecol) > 1
 
     result = ecol.truncate()
@@ -149,7 +149,7 @@ def test_truncate():
 
 def test_insert():
     assert '1' not in ecol
-    edge = ecol.insert_one(edge1)
+    edge = ecol.insert(edge1)
     assert edge['_key'] == '1'
     assert '1' in ecol
     assert len(ecol) == 1
@@ -160,7 +160,7 @@ def test_insert():
     assert edge['_to'] == edge1['_to']
 
     assert '2' not in ecol
-    edge = ecol.insert_one(edge2, sync=True)
+    edge = ecol.insert(edge2, sync=True)
     assert edge['_key'] == '2'
     assert '2' in ecol
     assert len(ecol) == 2
@@ -171,10 +171,10 @@ def test_insert():
     assert edge['_to'] == edge2['_to']
 
     with pytest.raises(DocumentInsertError):
-        ecol.insert_one(edge1)
+        ecol.insert(edge1)
 
     with pytest.raises(DocumentInsertError):
-        ecol.insert_one(edge2)
+        ecol.insert(edge2)
 
 
 def test_insert_many():
@@ -203,7 +203,7 @@ def test_insert_many():
 
 
 def test_get():
-    ecol.insert_one(edge1)
+    ecol.insert(edge1)
     edge = ecol.get('1')
     assert edge['_key'] == '1'
     assert edge['_from'] == edge1['_from']
@@ -234,28 +234,28 @@ def test_get_many():
 
 
 def test_update():
-    ecol.insert_one(edge1)
-    edge = ecol.update_one('1', {'value': 200})
+    ecol.insert(edge1)
+    edge = ecol.update('1', {'value': 200})
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] == 200
 
-    edge = ecol.update_one('1', {'value': None}, keep_none=True)
+    edge = ecol.update('1', {'value': None}, keep_none=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] is None
 
-    edge = ecol.update_one('1', {'value': {'bar': 1}}, sync=True)
+    edge = ecol.update('1', {'value': {'bar': 1}}, sync=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] == {'bar': 1}
 
-    edge = ecol.update_one('1', {'value': {'baz': 2}}, merge=True)
+    edge = ecol.update('1', {'value': {'baz': 2}}, merge=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert ecol['1']['value'] == {'bar': 1, 'baz': 2}
 
-    edge = ecol.update_one('1', {'value': None}, keep_none=False)
+    edge = ecol.update('1', {'value': None}, keep_none=False)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert 'value' not in ecol['1']
@@ -264,22 +264,22 @@ def test_update():
     new_rev = str(int(old_rev) + 1)
 
     with pytest.raises(DocumentRevisionError):
-        ecol.update_one('1', {'value': 300, '_rev': new_rev})
+        ecol.update('1', {'value': 300, '_rev': new_rev})
     assert 'value' not in ecol['1']
 
     with pytest.raises(DocumentUpdateError):
-        ecol.update_one('2', {'value': 300})
+        ecol.update('2', {'value': 300})
     assert 'value' not in ecol['1']
 
-    ecol.update_one('1', {'_to': '{}/3'.format(col)})
+    ecol.update('1', {'_to': '{}/3'.format(col)})
     assert ecol['1']['_to'] == '{}/3'.format(col)
 
-    ecol.update_one('1', {'_from': '{}/2'.format(col)})
+    ecol.update('1', {'_from': '{}/2'.format(col)})
     assert ecol['1']['_from'] == '{}/2'.format(col)
 
 
 def test_replace():
-    ecol.insert_one(edge1)
+    ecol.insert(edge1)
     new_data = {
         '_from': edge1['_from'],
         '_to': edge1['_to'],

@@ -29,9 +29,9 @@ def setup_function(*_):
 def test_async_insert():
     assert len(col) == 0
     async = database.async(return_result=True)
-    job1 = async.collection(col_name).insert_one({'_key': '1', 'val': 1})
-    job2 = async.collection(col_name).insert_one({'_key': '2', 'val': 2})
-    job3 = async.collection(col_name).insert_one({'_key': '3', 'val': 3})
+    job1 = async.collection(col_name).insert({'_key': '1', 'val': 1})
+    job2 = async.collection(col_name).insert({'_key': '2', 'val': 2})
+    job3 = async.collection(col_name).insert({'_key': '3', 'val': 3})
 
     sleep(1)
     print(job1.result())

@@ -126,7 +126,7 @@ def test_checksum():
     assert col.checksum(revision=False, data=False) == 0
     assert col.checksum(revision=False, data=True) == 0
 
-    col.insert_one({'foo': 'bar'})
+    col.insert({'foo': 'bar'})
     assert col.checksum(revision=True, data=False) > 0
     assert col.checksum(revision=True, data=True) > 0
     assert col.checksum(revision=False, data=False) > 0
@@ -134,8 +134,8 @@ def test_checksum():
 
 
 def test_truncate():
-    col.insert_one({'foo': 'bar'})
-    col.insert_one({'foo': 'bar'})
+    col.insert({'foo': 'bar'})
+    col.insert({'foo': 'bar'})
     assert len(col) > 1
 
     result = col.truncate()
@@ -145,7 +145,7 @@ def test_truncate():
 
 def test_insert():
     for i in range(1, 6):
-        doc = col.insert_one({'_key': str(i), 'foo': i * 100})
+        doc = col.insert({'_key': str(i), 'foo': i * 100})
         assert doc['_id'] == '{}/{}'.format(col.name, str(i))
         assert doc['_key'] == str(i)
 
@@ -157,12 +157,12 @@ def test_insert():
         assert document['foo'] == key * 100
 
     assert '6' not in col
-    col.insert_one({'_key': '6', 'foo': 200}, sync=True)
+    col.insert({'_key': '6', 'foo': 200}, sync=True)
     assert '6' in col
     assert col.get('6')['foo'] == 200
 
     with pytest.raises(DocumentInsertError):
-        col.insert_one({'_key': '1', 'foo': 300})
+        col.insert({'_key': '1', 'foo': 300})
     assert col['1']['foo'] == 100
 
 
@@ -209,7 +209,7 @@ def test_insert_many():
 
 
 def test_get():
-    col.insert_one({'_key': '1', 'foo': 100})
+    col.insert({'_key': '1', 'foo': 100})
     doc = col.get('1')
     assert doc['foo'] == 100
 
@@ -245,30 +245,30 @@ def test_get_many():
 
 
 def test_update():
-    col.insert_one({'_key': '1', 'foo': 100})
+    col.insert({'_key': '1', 'foo': 100})
     assert col['1']['foo'] == 100
 
-    doc = col.update_one('1', {'foo': 200})
+    doc = col.update('1', {'foo': 200})
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == 200
 
-    doc = col.update_one('1', {'foo': None}, keep_none=True)
+    doc = col.update('1', {'foo': None}, keep_none=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] is None
     
-    doc = col.update_one('1', {'foo': {'bar': 1}}, sync=True)
+    doc = col.update('1', {'foo': {'bar': 1}}, sync=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == {'bar': 1}
 
-    doc = col.update_one('1', {'foo': {'baz': 2}}, merge=True)
+    doc = col.update('1', {'foo': {'baz': 2}}, merge=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == {'bar': 1, 'baz': 2}
 
-    doc = col.update_one('1', {'foo': None}, keep_none=False)
+    doc = col.update('1', {'foo': None}, keep_none=False)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert 'foo' not in col['1']
@@ -277,16 +277,16 @@ def test_update():
     new_rev = str(int(old_rev) + 1)
 
     with pytest.raises(DocumentRevisionError):
-        col.update_one('1', {'foo': 300, '_rev': new_rev})
+        col.update('1', {'foo': 300, '_rev': new_rev})
     assert 'foo' not in col['1']
 
     with pytest.raises(DocumentUpdateError):
-        col.update_one('2', {'foo': 300})
+        col.update('2', {'foo': 300})
     assert 'foo' not in col['1']
 
 
 def test_replace():
-    doc = col.insert_one({'_key': '1', 'foo': 100})
+    doc = col.insert({'_key': '1', 'foo': 100})
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert col['1']['foo'] == 100
@@ -395,7 +395,7 @@ def test_all():
         {'_key': '5', 'foo': 500},
     ]
     for doc in inserted:
-        col.insert_one(doc)
+        col.insert(doc)
     fetched = list(col.all())
     assert len(fetched) == len(inserted)
     for doc in fetched:

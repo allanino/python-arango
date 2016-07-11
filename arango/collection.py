@@ -1073,7 +1073,7 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def insert_one(self, document, sync=None):
+    def insert(self, document, sync=None):
         """Insert a single document into the collection.
 
         If ``data`` contains the ``_key`` field, its value will be used as the
@@ -1143,13 +1143,12 @@ class Collection(BaseCollection):
         def handler(res):
             if res.status_code not in HTTP_OK:
                 raise DocumentInsertError(res)
-            del res.body['error']
             return res.body
 
         return request, handler
 
-    def update_one(self, key, data, rev=None, merge=True, keep_none=True,
-                   sync=None):
+    def update(self, key, body, rev=None, merge=True, keep_none=True,
+               sync=None):
         """Update the given document in the collection.
 
         If "_rev" field is present in ``data``, its value is compared against
@@ -1165,8 +1164,8 @@ class Collection(BaseCollection):
 
         :param key: the key of the document to be replaced
         :type key: str
-        :param data: the document with the updates
-        :type data: dict
+        :param body: the document body
+        :type body: dict
         :param rev: the document revision
         :type rev: str | None
         :param merge: whether to merge sub-dictionaries
@@ -1183,17 +1182,14 @@ class Collection(BaseCollection):
         if sync is not None:
             params['waitForSync'] = sync
 
+        headers = {}
         if rev is not None:
-            headers = {'If-Match': rev}
-        elif '_rev' in data:
-            headers = {'If-Match': data['_rev']}
-        else:
-            headers = {}
+            headers['If-Match'] = rev
 
         request = Request(
             method='patch',
             endpoint='/_api/document/{}/{}'.format(self._name, key),
-            data=data,
+            data=body,
             params=params,
             headers=headers
         )
@@ -1248,7 +1244,7 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def replace(self, key, data, rev=None, sync=False):
+    def replace(self, key, body, rev=None, sync=False):
         """Replace the specified document in the collection.
 
         If "_rev" field is present in ``data``, its value is compared against
@@ -1261,8 +1257,8 @@ class Collection(BaseCollection):
 
         :param key: the key of the document to be replaced
         :type key: str
-        :param data: the body to replace the document with
-        :type data: dict
+        :param body: the body to replace the document with
+        :type body: dict
         :param rev: the document revision must match this value
         :type rev: str | None
         :param sync: wait for the replace to sync to disk
@@ -1274,8 +1270,8 @@ class Collection(BaseCollection):
         params = {'waitForSync': sync}
         if rev is not None:
             headers = {'If-Match': rev}
-        elif '_rev' in data:
-            headers = {'If-Match': data['_rev']}
+        elif '_rev' in body:
+            headers = {'If-Match': body['_rev']}
         else:
             headers = {}
 
@@ -1283,7 +1279,7 @@ class Collection(BaseCollection):
             method='put',
             endpoint='/_api/document/{}/{}'.format(self._name, key),
             params=params,
-            data=data,
+            data=body,
             headers=headers
         )
 
