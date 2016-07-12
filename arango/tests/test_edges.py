@@ -464,29 +464,29 @@ def test_find():
 
 
 def test_find_and_update():
-    assert ecol.find_and_update({'value': 100}, {'bar': 100}) == 0
+    assert ecol.update_matching({'value': 100}, {'bar': 100}) == 0
     e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
     e1['value'], e2['value'], e3['value'], e4['value'] = 100, 100, 200, 300
     inserted = [e1, e2, e3, e4]
     ecol.insert_many(inserted)
 
-    assert ecol.find_and_update({'value': 100}, {'new_value': 200}) == 2
+    assert ecol.update_matching({'value': 100}, {'new_value': 200}) == 2
     for key in ['1', '2']:
         assert ecol[key]['value'] == 100
         assert ecol[key]['new_value'] == 200
 
-    assert ecol.find_and_update({'value': 200}, {'new_value': 100}) == 1
+    assert ecol.update_matching({'value': 200}, {'new_value': 100}) == 1
     assert ecol['3']['value'] == 200
     assert ecol['3']['new_value'] == 100
 
-    assert ecol.find_and_update(
+    assert ecol.update_matching(
         {'value': 300},
         {'value': None},
         sync=True,
         keep_none=True
     ) == 1
     assert ecol['4']['value'] is None
-    assert ecol.find_and_update(
+    assert ecol.update_matching(
         {'value': 200},
         {'value': None},
         sync=True,
@@ -497,20 +497,20 @@ def test_find_and_update():
 
 
 def test_find_and_replace():
-    assert ecol.find_and_replace({'value': 100}, {'bar': 100}) == 0
+    assert ecol.replace_matching({'value': 100}, {'bar': 100}) == 0
     e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
     e1['value'], e2['value'], e3['value'], e4['value'] = 100, 100, 200, 300
     inserted = [e1, e2, e3, e4]
     ecol.insert_many(inserted)
 
-    assert ecol.find_and_replace(
+    assert ecol.replace_matching(
         {'value': 200},
         {'_from': e3['_from'], '_to': e3['_to'], 'new_value': 100}
     ) == 1
     assert 'value' not in ecol['3']
     assert ecol['3']['new_value'] == 100
 
-    assert ecol.find_and_replace(
+    assert ecol.replace_matching(
         {'value': 100},
         {'_from': e1['_from'], '_to': e1['_to'], 'new_value': 400}
     ) == 2
@@ -518,7 +518,7 @@ def test_find_and_replace():
         assert 'value' not in ecol[key]
         assert ecol[key]['new_value'] == 400
 
-    assert ecol.find_and_replace(
+    assert ecol.replace_matching(
         {'value': 500},
         {'_from': e2['_from'], '_to': e2['_to'], 'new_value': 500}
     ) == 0
@@ -530,21 +530,21 @@ def test_find_and_replace():
 
 
 def test_find_and_delete():
-    assert ecol.find_and_delete({'value': 100}) == 0
+    assert ecol.delete_matching({'value': 100}) == 0
     e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
     e1['value'], e2['value'], e3['value'], e4['value'] = 100, 100, 200, 300
     inserted = [e1, e2, e3, e4]
     ecol.insert_many(inserted)
 
     assert '3' in ecol
-    assert ecol.find_and_delete({'value': 200}) == 1
+    assert ecol.delete_matching({'value': 200}) == 1
     assert '3' not in ecol
 
     assert '4' in ecol
-    assert ecol.find_and_delete({'value': 300}, sync=True) == 1
+    assert ecol.delete_matching({'value': 300}, sync=True) == 1
     assert '4' not in ecol
 
-    assert ecol.find_and_delete({'value': 100}, limit=1) == 1
+    assert ecol.delete_matching({'value': 100}, limit=1) == 1
     count = 0
     for key in ['1', '2']:
         if key in ecol:

@@ -12,6 +12,8 @@ from arango.api import APIWrapper
 class BaseCollection(APIWrapper):
     """Base ArangoDB collection object.
 
+    All collection classes inherit from this class.
+
     :param connection: ArangoDB connection object
     :type connection: arango.connection.Connection
     :param name: the name of the collection
@@ -1032,34 +1034,29 @@ class Collection(BaseCollection):
     def __repr__(self):
         return "<ArangoDB collection '{}'>".format(self._name)
 
-    @property
-    def name(self):
-        """Return the name of the collection.
-
-        :returns: the name of the collection
-        :rtype: str
-        """
-        return self._name
-
     def get(self, key, rev=None):
-        """Return the document with the specified key.
+        """Fetch a document from the collection.
 
-        If ``rev`` is given it's compared against the revision of the fetched
-        document. If the revisions do not match, ``DocumentRevisionError`` is
-        raised.
+        If ``rev`` is given, its value is compared against the revision of the
+        fetched document. DocumentRevisionError is raised if the revisions do
+        not match.
 
         :param key: the document key
         :type key: str
         :param rev: the document revision
         :type rev: str | None
-        :returns: the requested document | None if not found
+        :returns: the document or None if not found
         :rtype: dict | None
         :raises: DocumentRevisionError, DocumentGetError
         """
+        headers = {}
+        if rev is not None:
+            headers['If-Match'] = rev
+
         request = Request(
             method='get',
             endpoint='/_api/document/{}/{}'.format(self._name, key),
-            headers={} if rev is None else {'If-Match': rev}
+            headers=headers
         )
 
         def handler(res):
@@ -1073,26 +1070,30 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def insert(self, document, sync=None):
-        """Insert a single document into the collection.
+    def insert(self, document, key=None, sync=None):
+        """Insert a new document into the collection.
 
-        If ``data`` contains the ``_key`` field, its value will be used as the
-        key of the new vertex. The must be unique in the vertex collection.
+        If ``key`` is given, its value is used as the key of the new document.
+        If "_key" field is present in ``document``, its value is used as the
+        key of the new document as well. The value of ``key`` takes precedence
+        over the value of "_key" field in ``document``. The key must be unique
+        in the collection.
 
-        :param document: the body of the new document
+        :param document: the document body
         :type document: dict
-        :param sync: wait for create to sync to disk
+        :param key: the document key
+        :type key: str
+        :param sync: wait for the operation to sync to disk
         :type sync: bool
-        :returns: the ID, rev and key of the new document
+        :returns: the ID, rev and key of the document
         :rtype: dict
-        :raises:
-            DocumentInsertError,
-            DocumentInvalidError,
-            CollectionNotFoundError
+        :raises: DocumentInsertError
         """
         params = {'collection': self._name}
         if sync is not None:
             params['waitForSync'] = sync
+        if key is not None:
+            document['_key'] = key
 
         request = Request(
             method='post',
@@ -1102,11 +1103,7 @@ class Collection(BaseCollection):
         )
 
         def handler(res):
-            if res.status_code == 400:
-                raise DocumentInvalidError(res)
-            elif res.status_code == 404:
-                raise CollectionNotFoundError(res)
-            elif res.status_code not in HTTP_OK:
+            if res.status_code not in HTTP_OK:
                 raise DocumentInsertError(res)
             return res.body
 
@@ -1115,18 +1112,18 @@ class Collection(BaseCollection):
     def insert_many(self, documents, halt_on_error=True, details=True):
         """Insert multiple documents into the collection in bulk.
 
-        The order of the documents are not retained. If ``details`` is set to
-        True, the result will contain an extra list of error messages.
+        The order of the inserted documents are not retained. If ``details``
+        is set to True, the result will contain a list of error messages.
 
-        :param documents: list of documents to insert
+        :param documents: list of documents
         :type documents: list
-        :param halt_on_error: halt on an invalid document
+        :param halt_on_error: halt on a insert failure
         :type halt_on_error: bool
-        :param details: include details on failed inserts
+        :param details: include details on insert failures
         :type details: bool
         :returns: the result of the operation
         :rtype: dict
-        :raises: DocumentsInsertManyError
+        :raises: DocumentsInsertError
         """
         request = Request(
             method='post',
@@ -1147,25 +1144,26 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def update(self, key, body, rev=None, merge=True, keep_none=True,
-               sync=None):
-        """Update the given document in the collection.
+    def update(self, document, merge=True, keep_none=True, sync=None):
+        """Update a document in the collection.
 
-        If "_rev" field is present in ``data``, its value is compared against
-        the revision of the fetched document. If the revisions do not match,
-        ``DocumentRevisionError`` is raised. If ``rev`` argument is specified,
-        its value is preferred over the "_rev" field.
+        If ``rev`` is given, its value is compared against the revision of the
+        fetched document. If "_rev" field is present in ``body``, its value is
+        compared against the revision of the document as well. The value of
+        ``rev`` takes precedence over the value of "_rev" field in ``body``.
+        DocumentRevisionError is raised if the revisions do not match.
 
         If ``merge`` is set to True, sub-dictionaries in the document are
-        merged as opposed to being replaced.
+        merged rather than replaced.
 
-        If ``keep_none`` is set to True, the fields with value None are kept.
-        Otherwise, they are removed from the document.
+        If ``keep_none`` is set to True, the fields whose value is None are
+        retained in the document. Otherwise, the field is  from the document
+        completely.
 
-        :param key: the key of the document to be replaced
+        :param key: the document key
         :type key: str
-        :param body: the document body
-        :type body: dict
+        :param document: the document body
+        :type document: dict
         :param rev: the document revision
         :type rev: str | None
         :param merge: whether to merge sub-dictionaries
@@ -1189,7 +1187,7 @@ class Collection(BaseCollection):
         request = Request(
             method='patch',
             endpoint='/_api/document/{}/{}'.format(self._name, key),
-            data=body,
+            data=document,
             params=params,
             headers=headers
         )
@@ -1203,38 +1201,38 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def find_and_update(self, filters, data, limit=None, keep_none=True,
+    def update_matching(self, filters, document, limit=None, keep_none=True,
                         sync=False):
         """Update the matching documents.
 
         :param filters: the filters
         :type filters: dict
-        :param data: the new document body to update with
-        :type data: dict
+        :param document: the document body
+        :type document: dict
         :param limit: the maximum number of documents to return
         :type limit: int
-        :param keep_none: whether or not to keep the None values
+        :param keep_none: keep the fields whose value is None
         :type keep_none: bool
-        :param sync: wait for the update to sync to disk
+        :param sync: wait for the operation to sync to disk
         :type sync: bool
         :returns: the number of documents updated
         :rtype: int
         :raises: DocumentFindAndUpdateError
         """
-        data = {
+        document = {
             'collection': self._name,
             'example': filters,
-            'newValue': data,
+            'newValue': document,
             'keepNull': keep_none,
             'waitForSync': sync,
         }
         if limit is not None:
-            data['limit'] = limit
+            document['limit'] = limit
 
         request = Request(
             method='put',
             endpoint='/_api/simple/update-by-example',
-            data=data
+            data=document
         )
 
         def handler(res):
@@ -1292,7 +1290,7 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def find_and_replace(self, filters, data, limit=None, sync=False):
+    def replace_matching(self, filters, data, limit=None, sync=False):
         """Replace matching documents.
 
         :param filters: the match filters
@@ -1396,7 +1394,7 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def find_and_delete(self, filters, limit=None, sync=None):
+    def delete_matching(self, filters, limit=None, sync=None):
         """Delete matching documents from the collection.
 
         :param filters: the filters

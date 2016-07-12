@@ -630,7 +630,9 @@ class EdgeCollection(BaseCollection):
         return self._graph
 
     def insert(self, document, sync=False):
-        """Insert a new document into the collection.
+        """Insert a new document into the edge collection.
+
+        The ``document`` must contain the "_from" and "_to" keys.
 
         :param document: the document body
         :type document: dict
@@ -707,9 +709,6 @@ class EdgeCollection(BaseCollection):
         If the ``_rev`` key is in ``data``, the revision of the target
         edge must match against its value. Otherwise a EdgeRevision
         error is thrown. If ``rev`` is also provided, its value is preferred.
-
-        The ``_from`` and ``_to`` attributes are immutable, and they are
-        ignored if present in ``data``
 
         :param document: the document body
         :type document: dict
@@ -812,7 +811,7 @@ class EdgeCollection(BaseCollection):
         :type sync: bool
         :param ignore_missing: do not raise an error if document is missing
         :type ignore_missing: bool
-        :returns: the id, rev and key of the target document
+        :returns: the id, rev and key of the document
         :rtype: dict
         :raises: KeyError, DocumentRevisionError, DocumentDeleteError
         """

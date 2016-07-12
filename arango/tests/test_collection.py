@@ -462,7 +462,7 @@ def test_find():
 
 
 def test_find_and_update():
-    assert col.find_and_update({'foo': 100}, {'bar': 100}) == 0
+    assert col.update_matching({'foo': 100}, {'bar': 100}) == 0
     col.insert_many([
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 100},
@@ -471,11 +471,11 @@ def test_find_and_update():
         {'_key': '5', 'foo': 300},
     ])
 
-    assert col.find_and_update({'foo': 200}, {'bar': 100}) == 1
+    assert col.update_matching({'foo': 200}, {'bar': 100}) == 1
     assert col['4']['foo'] == 200
     assert col['4']['bar'] == 100
 
-    assert col.find_and_update({'foo': 100}, {'bar': 100}) == 3
+    assert col.update_matching({'foo': 100}, {'bar': 100}) == 3
     for key in ['1', '2', '3']:
         assert col[key]['foo'] == 100
         assert col[key]['bar'] == 100
@@ -483,18 +483,18 @@ def test_find_and_update():
     assert col['5']['foo'] == 300
     assert 'bar' not in col['5']
 
-    assert col.find_and_update(
+    assert col.update_matching(
         {'foo': 300}, {'foo': None}, sync=True, keep_none=True
     ) == 1
     assert col['5']['foo'] is None
-    assert col.find_and_update(
+    assert col.update_matching(
         {'foo': 200}, {'foo': None}, sync=True, keep_none=False
     ) == 1
     assert 'foo' not in col['4']
 
 
 def test_find_and_replace():
-    assert col.find_and_replace({'foo': 100}, {'bar': 100}) == 0
+    assert col.replace_matching({'foo': 100}, {'bar': 100}) == 0
     col.insert_many([
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 100},
@@ -503,11 +503,11 @@ def test_find_and_replace():
         {'_key': '5', 'foo': 300},
     ])
 
-    assert col.find_and_replace({'foo': 200}, {'bar': 100}) == 1
+    assert col.replace_matching({'foo': 200}, {'bar': 100}) == 1
     assert 'foo' not in col['4']
     assert col['4']['bar'] == 100
 
-    assert col.find_and_replace({'foo': 100}, {'bar': 100}) == 3
+    assert col.replace_matching({'foo': 100}, {'bar': 100}) == 3
     for key in ['1', '2', '3']:
         assert 'foo' not in col[key]
         assert col[key]['bar'] == 100
@@ -517,7 +517,7 @@ def test_find_and_replace():
 
 
 def test_find_and_delete():
-    assert col.find_and_delete({'foo': 100}) == 0
+    assert col.delete_matching({'foo': 100}) == 0
     col.insert_many([
         {'_key': '1', 'foo': 100},
         {'_key': '2', 'foo': 100},
@@ -527,14 +527,14 @@ def test_find_and_delete():
     ])
 
     assert '4' in col
-    assert col.find_and_delete({'foo': 200}) == 1
+    assert col.delete_matching({'foo': 200}) == 1
     assert '4' not in col
 
     assert '5' in col
-    assert col.find_and_delete({'foo': 300}, sync=True) == 1
+    assert col.delete_matching({'foo': 300}, sync=True) == 1
     assert '5' not in col
 
-    assert col.find_and_delete({'foo': 100}, limit=2) == 2
+    assert col.delete_matching({'foo': 100}, limit=2) == 2
     count = 0
     for key in ['1', '2', '3']:
         if key in col:
