@@ -270,4 +270,3 @@ class AsyncJob(object):
             raise AsyncJobNotFoundError(res)
         else:
             raise AsyncJobResultDeleteError(res)
-

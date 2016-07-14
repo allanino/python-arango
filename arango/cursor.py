@@ -112,4 +112,3 @@ class Cursor(object):
         if res.status_code not in {404, 202}:
             raise CursorCloseError(res)
         return True
-

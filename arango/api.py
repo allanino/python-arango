@@ -4,13 +4,16 @@ from functools import wraps
 
 
 class APIWrapper(object):
-    """ArangoDB API wrapper."""
+    """ArangoDB API wrapper.
 
-    _internal_methods = {'name'}
+    This class is meant to be used internally only.
+    """
+
+    _normal_methods = {'name'}
 
     def __getattribute__(self, attr):
         method = object.__getattribute__(self, attr)
-        internal = object.__getattribute__(self, '_internal_methods')
+        internal = object.__getattribute__(self, '_normal_methods')
 
         if attr in internal or attr.startswith('_') or attr.isupper():
             return method

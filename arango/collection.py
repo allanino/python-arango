@@ -39,18 +39,18 @@ class BaseCollection(APIWrapper):
         self._name = name
 
     def __iter__(self):
-        """Iterate through the documents in the collection.
+        """Fetch all documents in the collection.
 
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
-        :raises: DocumentIterateError
+        :raises: DocumentFetchError
         """
         res = self._conn.put(
             endpoint='/_api/simple/all',
             data={'collection': self._name}
         )
         if res.status_code not in HTTP_OK:
-            raise DocumentIterateError(res)
+            raise DocumentFetchError(res)
         return Cursor(self._conn, res.body)
 
     def __len__(self):
@@ -83,7 +83,7 @@ class BaseCollection(APIWrapper):
         elif res.status_code == 404:
             return None
         elif res.status_code not in HTTP_OK:
-            raise DocumentGetError(res)
+            raise DocumentFetchError(res)
         return res.body
 
     def __contains__(self, key):
@@ -243,7 +243,7 @@ class BaseCollection(APIWrapper):
     def set_properties(self, sync=None, journal_size=None):
         """Set the collection properties.
 
-        :param sync: wait for operations to sync to disk
+        :param sync: wait for the operation to sync to disk
         :type sync: bool | None
         :param journal_size: the journal size
         :type journal_size: int
@@ -325,7 +325,7 @@ class BaseCollection(APIWrapper):
 
         return request, handler
 
-    def rotate(self):
+    def rotate_journal(self):
         """Rotate the collection journal.
 
         :returns: the result of the operation
@@ -371,7 +371,7 @@ class BaseCollection(APIWrapper):
     def truncate(self):
         """Truncate the collection.
 
-        :returns: the collection summary
+        :returns: the collection details
         :rtype: dict
         :raises: CollectionTruncateError
         """
@@ -462,7 +462,6 @@ class BaseCollection(APIWrapper):
         :rtype: arango.cursor.Cursor
         :raises: DocumentsExportError
         """
-        params = {'collection': self._name}
         options = {}
         if flush is not None:
             options['flush'] = flush
@@ -478,13 +477,12 @@ class BaseCollection(APIWrapper):
             options['ttl'] = ttl
         if restrict is not None:
             options['restrict'] = restrict
-        data = {'options': options} if options else {}
 
         request = Request(
             method='post',
             endpoint='/_api/export',
-            params=params,
-            data=data
+            params={'collection': self._name},
+            data={'options': options} if options else {}
         )
 
         def handler(res):
@@ -498,16 +496,16 @@ class BaseCollection(APIWrapper):
     # Simple Queries #
     ##################
 
-    def all(self, offset=None, limit=None):
+    def fetch_all(self, offset=None, limit=None):
         """Return all documents in the collection.
 
         :param offset: the number of documents to skip
         :type offset: int
-        :param limit: the maximum number of documents to return
+        :param limit: the max number of documents to return
         :type limit: int
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
-        :raises: DocumentIterateError
+        :raises: DocumentFetchError
         """
         data = {'collection': self._name}
         if offset is not None:
@@ -523,17 +521,17 @@ class BaseCollection(APIWrapper):
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise DocumentIterateError(res)
+                raise DocumentFetchError(res)
             return Cursor(self._conn, res.body)
 
         return request, handler
 
-    def random(self):
+    def fetch_random(self):
         """Return a random document from the collection.
 
         :returns: the random document
         :rtype: dict
-        :raises: DocumentGetRandomError
+        :raises: DocumentFetchError
         """
         request = Request(
             method='put',
@@ -543,19 +541,19 @@ class BaseCollection(APIWrapper):
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise DocumentGetRandomError(res)
+                raise DocumentFetchError(res)
             return res.body['document']
 
         return request, handler
 
-    def get_many(self, keys):
+    def fetch_by_keys(self, keys):
         """Return all documents whose key is in ``keys``.
 
         :param keys: the document keys
         :type keys: list
         :returns: the list of documents
         :rtype: list
-        :raises: DocumentGetManyError
+        :raises: DocumentFetchError
         """
         request = Request(
             method='put',
@@ -565,23 +563,23 @@ class BaseCollection(APIWrapper):
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise DocumentGetError(res)
+                raise DocumentFetchError(res)
             return res.body['documents']
 
         return request, handler
 
-    def find(self, filters, offset=None, limit=None):
+    def fetch(self, filters, offset=None, limit=None):
         """Return documents that match the given filters.
 
         :param filters: the document filters
         :type filters: dict
         :param offset: the number of documents to skip
         :type offset: int
-        :param limit: the maximum number of documents to return
+        :param limit: the max number of documents to return
         :type limit: int
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
-        :raises: DocumentFindError
+        :raises: DocumentFetchError
         """
         data = {'collection': self._name, 'example': filters}
         if offset is not None:
@@ -597,12 +595,12 @@ class BaseCollection(APIWrapper):
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise DocumentFindError(res)
+                raise DocumentFetchError(res)
             return Cursor(self._conn, res.body)
 
         return request, handler
 
-    def find_near(self, latitude, longitude, limit=None):
+    def fetch_near(self, latitude, longitude, limit=None):
         """Return documents near a given coordinate.
 
         By default, at most 100 documents near the coordinate are returned.
@@ -616,11 +614,11 @@ class BaseCollection(APIWrapper):
         :type latitude: int
         :param longitude: the longitude
         :type longitude: int
-        :param limit: the maximum number of documents to return
+        :param limit: the max number of documents to return
         :type limit: int | None
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
-        :raises: DocumentFindNearError
+        :raises: DocumentFetchError
         """
         full_query = """
         FOR doc IN NEAR(@collection, @latitude, @longitude{})
@@ -643,13 +641,13 @@ class BaseCollection(APIWrapper):
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise DocumentFindNearError(res)
+                raise DocumentFetchError(res)
             return Cursor(self._conn, res.body)
 
         return request, handler
 
-    def find_in_range(self, field, lower, upper, offset=0, limit=100,
-                      inclusive=True):
+    def fetch_in_range(self, field, lower, upper, offset=0, limit=100,
+                       inclusive=True):
         """Return documents within a given range.
 
         The returned documents are ordered randomly. A geo index must be
@@ -663,13 +661,13 @@ class BaseCollection(APIWrapper):
         :type upper: int
         :param offset: the number of documents to skip
         :type offset: int | None
-        :param limit: the maximum number of documents to return
+        :param limit: the max number of documents to return
         :type limit: int | None
         :param inclusive: whether to include the lower and upper bounds
         :type inclusive: bool
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
-        :raises: DocumentFindInRangeError
+        :raises: DocumentFetchError
         """
         if inclusive:
             full_query = """
@@ -702,13 +700,13 @@ class BaseCollection(APIWrapper):
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise DocumentFindInRangeError(res)
+                raise DocumentFetchError(res)
             return Cursor(self._conn, res.body)
 
         return request, handler
 
     # TODO the WITHIN geo function does not seem to work properly
-    def find_in_radius(self, latitude, longitude, radius, distance_key=None):
+    def fetch_in_radius(self, latitude, longitude, radius, distance_key=None):
         """Return documents within a given radius.
 
         The returned documents are ordered randomly. A geo index must be
@@ -724,7 +722,7 @@ class BaseCollection(APIWrapper):
         :type distance_key: str
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
-        :raises: DocumentFindInRadiusError
+        :raises: DocumentFetchError
         """
         full_query = """
         FOR doc IN WITHIN(@collection, @latitude, @longitude, @radius{})
@@ -748,13 +746,13 @@ class BaseCollection(APIWrapper):
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise DocumentFindInRadiusError(res)
+                raise DocumentFetchError(res)
             return Cursor(self._conn, res.body)
 
         return request, handler
 
-    def find_in_box(self, latitude1, longitude1, latitude2, longitude2,
-                    skip=None, limit=None, geo=None):
+    def fetch_in_box(self, latitude1, longitude1, latitude2, longitude2,
+                     skip=None, limit=None, geo=None):
         """Return all documents in a square area.
 
         A geo index must be defined in the collection for this method to be
@@ -771,13 +769,13 @@ class BaseCollection(APIWrapper):
         :type longitude2: int
         :param skip: the number of documents to skip
         :type skip: int
-        :param limit: the maximum number of documents to return
+        :param limit: the max number of documents to return
         :type limit: int
         :param geo: the field to use (must have geo-index)
         :type geo: str
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
-        :raises: DocumentFindInRectangleError
+        :raises: DocumentFetchError
         """
         data = {
             'collection': self._name,
@@ -801,23 +799,23 @@ class BaseCollection(APIWrapper):
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise DocumentFindInRectangleError(res)
+                raise DocumentFetchError(res)
             return Cursor(self._conn, res.body)
 
         return request, handler
 
-    def find_text(self, key, query, limit=None):
+    def fetch_by_text(self, key, query, limit=None):
         """Return documents that match the specified fulltext ``query``.
 
         :param key: the key with a fulltext index
         :type key: str
         :param query: the fulltext query
         :type query: str
-        :param limit: the maximum number of documents to return
+        :param limit: the max number of documents to return
         :type limit: int
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
-        :raises: DocumentFindTextError
+        :raises: DocumentFetchError
         """
         full_query = """
         FOR doc IN FULLTEXT(@collection, @field, @query{})
@@ -840,7 +838,7 @@ class BaseCollection(APIWrapper):
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise DocumentFindTextError(res)
+                raise DocumentFetchError(res)
             return Cursor(self._conn, res.body)
 
         return request, handler
@@ -914,7 +912,7 @@ class BaseCollection(APIWrapper):
 
         return request, handler
 
-    def create_hash_index(self, fields, unique=None, sparse=None):
+    def add_hash_index(self, fields, unique=None, sparse=None):
         """Create a new hash index in the collection.
 
         :param fields: the document fields to index
@@ -932,7 +930,7 @@ class BaseCollection(APIWrapper):
             data['sparse'] = sparse
         return self._add_index(data)
 
-    def create_skiplist_index(self, fields, unique=None, sparse=None):
+    def add_skiplist_index(self, fields, unique=None, sparse=None):
         """Create a new skiplist index in the collection.
 
         A skiplist index is used to find the ranges of documents (e.g. time).
@@ -952,7 +950,7 @@ class BaseCollection(APIWrapper):
             data['sparse'] = sparse
         return self._add_index(data)
 
-    def create_geo_index(self, fields, ordered=None, unique=None):
+    def add_geo_index(self, fields, ordered=None, unique=None):
         """Create a geo-spatial index in the collection.
 
         If ``fields`` only has one value, then a geo-spatial index is created
@@ -979,7 +977,7 @@ class BaseCollection(APIWrapper):
             data['unique'] = unique
         return self._add_index(data)
 
-    def create_fulltext_index(self, fields, minimum_length=None):
+    def add_fulltext_index(self, fields, minimum_length=None):
         """Create a fulltext index to the collection.
 
         A fulltext index is used to find words or prefixes of words. Only words
@@ -1034,11 +1032,11 @@ class Collection(BaseCollection):
     def __repr__(self):
         return "<ArangoDB collection '{}'>".format(self._name)
 
-    def get(self, key, rev=None):
+    def fetch_by_key(self, key, rev=None):
         """Fetch a document from the collection.
 
         If ``rev`` is given, its value is compared against the revision of the
-        fetched document. DocumentRevisionError is raised if the revisions do
+        target document. DocumentRevisionError is raised if the revisions do
         not match.
 
         :param key: the document key
@@ -1047,7 +1045,7 @@ class Collection(BaseCollection):
         :type rev: str | None
         :returns: the document or None if not found
         :rtype: dict | None
-        :raises: DocumentRevisionError, DocumentGetError
+        :raises: DocumentRevisionError, DocumentFetchError
         """
         headers = {}
         if rev is not None:
@@ -1065,35 +1063,28 @@ class Collection(BaseCollection):
             elif res.status_code == 404:
                 return None
             elif res.status_code not in HTTP_OK:
-                raise DocumentGetError(res)
+                raise DocumentFetchError(res)
             return res.body
 
         return request, handler
 
-    def insert(self, document, key=None, sync=None):
+    def insert_one(self, document, sync=None):
         """Insert a new document into the collection.
 
-        If ``key`` is given, its value is used as the key of the new document.
-        If "_key" field is present in ``document``, its value is used as the
-        key of the new document as well. The value of ``key`` takes precedence
-        over the value of "_key" field in ``document``. The key must be unique
-        in the collection.
+        If the "_key" field is present in ``document``, its value is used as
+        the key of the new document. The key must be unique in the collection.
 
         :param document: the document body
         :type document: dict
-        :param key: the document key
-        :type key: str
         :param sync: wait for the operation to sync to disk
         :type sync: bool
-        :returns: the ID, rev and key of the document
+        :returns: the ID, revision and key of the document
         :rtype: dict
         :raises: DocumentInsertError
         """
         params = {'collection': self._name}
         if sync is not None:
             params['waitForSync'] = sync
-        if key is not None:
-            document['_key'] = key
 
         request = Request(
             method='post',
@@ -1112,14 +1103,14 @@ class Collection(BaseCollection):
     def insert_many(self, documents, halt_on_error=True, details=True):
         """Insert multiple documents into the collection in bulk.
 
-        The order of the inserted documents are not retained. If ``details``
-        is set to True, the result will contain a list of error messages.
+        The order of the inserted documents are not retained. If ``details`` is
+        set to True, the output will have an additional list of error messages.
 
-        :param documents: list of documents
+        :param documents: the list of documents to insert
         :type documents: list
-        :param halt_on_error: halt on a insert failure
+        :param halt_on_error: halt the operation on a failure
         :type halt_on_error: bool
-        :param details: include details on insert failures
+        :param details: include details of the failures if any
         :type details: bool
         :returns: the result of the operation
         :rtype: dict
@@ -1144,31 +1135,72 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def update(self, document, merge=True, keep_none=True, sync=None):
+    def update(self, filters, body, limit=None, keep_none=True, sync=None):
+        """Update matching documents in the collection.
+
+        If ``keep_none`` is set to True, the fields whose value is None are
+        retained in the document. Otherwise, the field is removed from the
+        document completely.
+
+        :param filters: the filters
+        :type filters: dict
+        :param body: the document body
+        :type body: dict
+        :param limit: the max number of documents to return
+        :type limit: int
+        :param keep_none: keep the fields whose value is None
+        :type keep_none: bool
+        :param sync: wait for the operation to sync to disk
+        :type sync: bool
+        :returns: the number of documents updated
+        :rtype: int
+        :raises: DocumentUpdateError
+        """
+        data = {
+            'collection': self._name,
+            'example': filters,
+            'newValue': body,
+            'keepNull': keep_none,
+        }
+        if limit is not None:
+            data['limit'] = limit
+        if sync is not None:
+            data['waitForSync'] = sync
+
+        request = Request(
+            method='put',
+            endpoint='/_api/simple/update-by-example',
+            data=data
+        )
+
+        def handler(res):
+            if res.status_code not in HTTP_OK:
+                raise DocumentUpdateError(res)
+            return res.body['updated']
+
+        return request, handler
+
+    def update_one(self, document, merge=True, keep_none=True, sync=None):
         """Update a document in the collection.
 
-        If ``rev`` is given, its value is compared against the revision of the
-        fetched document. If "_rev" field is present in ``body``, its value is
-        compared against the revision of the document as well. The value of
-        ``rev`` takes precedence over the value of "_rev" field in ``body``.
-        DocumentRevisionError is raised if the revisions do not match.
+        The "_key" field must be present in ``document``.
+
+        If the "_rev" field is present in ``document``, its value is compared
+        against the revision of the target document. DocumentRevisionError is
+        raised if the revisions do not match.
 
         If ``merge`` is set to True, sub-dictionaries in the document are
         merged rather than replaced.
 
         If ``keep_none`` is set to True, the fields whose value is None are
-        retained in the document. Otherwise, the field is  from the document
-        completely.
+        retained in the document. Otherwise, the field is removed from the
+        document completely.
 
-        :param key: the document key
-        :type key: str
-        :param document: the document body
+        :param document: the document with new values
         :type document: dict
-        :param rev: the document revision
-        :type rev: str | None
-        :param merge: whether to merge sub-dictionaries
-        :type merge: bool | None
-        :param keep_none: whether or not to keep the items with value None
+        :param merge: merge sub-dictionaries rather than replace
+        :type merge: bool
+        :param keep_none: keep fields items with value None
         :type keep_none: bool
         :param sync: wait for the update to sync to disk
         :type sync: bool
@@ -1176,17 +1208,21 @@ class Collection(BaseCollection):
         :rtype: dict
         :raises: DocumentRevisionError, DocumentUpdateError
         """
+        _validate_document(document)
+
         params = {'keepNull': keep_none, 'mergeObjects': merge}
         if sync is not None:
             params['waitForSync'] = sync
 
         headers = {}
-        if rev is not None:
-            headers['If-Match'] = rev
+        if '_rev' in document:
+            headers['If-Match'] = document['_rev']
 
         request = Request(
             method='patch',
-            endpoint='/_api/document/{}/{}'.format(self._name, key),
+            endpoint='/_api/document/{}/{}'.format(
+                self._name, document['_key']
+            ),
             data=document,
             params=params,
             headers=headers
@@ -1201,118 +1237,30 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def update_matching(self, filters, document, limit=None, keep_none=True,
-                        sync=False):
-        """Update the matching documents.
+    def replace(self, filters, body, limit=None, sync=None):
+        """Replace matching documents in the collection.
 
-        :param filters: the filters
+        :param filters: the document filters
         :type filters: dict
-        :param document: the document body
-        :type document: dict
-        :param limit: the maximum number of documents to return
-        :type limit: int
-        :param keep_none: keep the fields whose value is None
-        :type keep_none: bool
-        :param sync: wait for the operation to sync to disk
-        :type sync: bool
-        :returns: the number of documents updated
-        :rtype: int
-        :raises: DocumentFindAndUpdateError
-        """
-        document = {
-            'collection': self._name,
-            'example': filters,
-            'newValue': document,
-            'keepNull': keep_none,
-            'waitForSync': sync,
-        }
-        if limit is not None:
-            document['limit'] = limit
-
-        request = Request(
-            method='put',
-            endpoint='/_api/simple/update-by-example',
-            data=document
-        )
-
-        def handler(res):
-            if res.status_code not in HTTP_OK:
-                raise DocumentFindAndUpdateError(res)
-            return res.body['updated']
-
-        return request, handler
-
-    def replace(self, key, body, rev=None, sync=False):
-        """Replace the specified document in the collection.
-
-        If "_rev" field is present in ``data``, its value is compared against
-        the revision of the fetched document. If the revisions do not match,
-        ``DocumentRevisionError`` is raised. If ``rev`` argument is specified,
-        its value is preferred over the "_rev" field.
-
-        For edge collections, the ``_from`` and ``_to`` must be provided in
-        data.
-
-        :param key: the key of the document to be replaced
-        :type key: str
-        :param body: the body to replace the document with
+        :param body: the document body
         :type body: dict
-        :param rev: the document revision must match this value
-        :type rev: str | None
-        :param sync: wait for the replace to sync to disk
-        :type sync: bool
-        :returns: the ID, rev and key of the replaced document
-        :rtype: dict
-        :raises: DocumentReplaceError
-        """
-        params = {'waitForSync': sync}
-        if rev is not None:
-            headers = {'If-Match': rev}
-        elif '_rev' in body:
-            headers = {'If-Match': body['_rev']}
-        else:
-            headers = {}
-
-        request = Request(
-            method='put',
-            endpoint='/_api/document/{}/{}'.format(self._name, key),
-            params=params,
-            data=body,
-            headers=headers
-        )
-
-        def handler(res):
-            if res.status_code == 412:
-                raise DocumentRevisionError(res)
-            elif res.status_code not in HTTP_OK:
-                raise DocumentReplaceError(res)
-            return res.body
-
-        return request, handler
-
-    def replace_matching(self, filters, data, limit=None, sync=False):
-        """Replace matching documents.
-
-        :param filters: the match filters
-        :type filters: dict
-        :param data: the replacement document
-        :type data: dict
-        :param limit: maximum number of documents to replace
+        :param limit: max number of documents to replace
         :type limit: int
-        :param sync: wait for the replacement to sync to disk
-        :type sync: bool
+        :param sync: wait for the operation to sync to disk
+        :type sync: bool | None
         :returns: the number of documents replaced
         :rtype: int
-        :raises: DocumentReplaceManyError
+        :raises: DocumentReplaceError
         """
         data = {
             'collection': self._name,
             'example': filters,
-            'newValue': data,
-            'waitForSync': sync,
+            'newValue': body
         }
         if limit is not None:
             data['limit'] = limit
+        if sync is not None:
+            data['waitForSync'] = sync
 
         request = Request(
             method='put',
@@ -1327,79 +1275,59 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def delete(self, key, rev=None, sync=False, ignore_missing=True):
-        """Delete a document from the collection.
+    def replace_one(self, document, sync=None):
+        """Replace the specified document in the collection.
 
-        :param key: the key of the document to be deleted
-        :type key: str
-        :param rev: the document revision must match this value
-        :type rev: str | None
-        :param sync: wait for the delete to sync to disk
-        :type sync: bool
-        :param ignore_missing: ignore missing documents
-        :type ignore_missing: bool
-        :returns: the id, rev and key of the deleted document
+        The "_key" field must be present in ``document``. For edge collections,
+        The "_from" and "_to" fields must also be present in ``document``.
+
+        If the "_rev" field is present in ``document``, its value is compared
+        against the revision of the target document. DocumentRevisionError is
+        raised if the revisions do not match.
+
+        :param document: the new document
+        :type document: dict
+        :param sync: wait for the replace to sync to disk
+        :type sync: bool | None
+        :returns: the ID, revision and key of the replaced document
         :rtype: dict
-        :raises: DocumentRevisionError, DocumentDeleteError
+        :raises: DocumentRevisionError, DocumentReplaceError
         """
-        params = {'waitForSync': sync}
-        if rev is not None:
-            headers = {'If-Match': rev}
-        else:
-            headers = {}
+        _validate_document(document)
+
+        params = {}
+        if sync is not None:
+            params['waitForSync'] = sync
+
+        headers = {}
+        if '_rev' in document:
+            headers['If-Match'] = document['_rev']
+
         request = Request(
-            method='delete',
-            endpoint='/_api/document/{}/{}'.format(self._name, key),
+            method='put',
+            endpoint='/_api/document/{}/{}'.format(
+                self._name, document['_key']
+            ),
             params=params,
+            data=document,
             headers=headers
         )
 
         def handler(res):
             if res.status_code == 412:
                 raise DocumentRevisionError(res)
-            elif res.status_code == 404:
-                if ignore_missing:
-                    return None
-                raise DocumentDeleteError(res)
             elif res.status_code not in HTTP_OK:
-                raise DocumentDeleteError(res)
+                raise DocumentReplaceError(res)
             return res.body
 
         return request, handler
 
-    def delete_many(self, keys, sync=None):
-        """Delete documents whose keys are in ``keys``.
-
-        :param keys: keys of documents to delete
-        :type keys: list
-        :param sync: wait for the deletes to sync to disk
-        :type sync: bool | None
-        :returns: the number of documents deleted
-        :rtype: dict
-        :raises: SimpleQueryDeleteByKeysError
-        """
-        data = {'collection': self._name, 'keys': keys}
-        if sync is not None:
-            data['waitForSync'] = sync
-        request = Request(
-            method='put',
-            endpoint='/_api/simple/remove-by-keys',
-            data=data
-        )
-
-        def handler(res):
-            if res.status_code not in HTTP_OK:
-                raise DocumentDeleteError(res)
-            return res.body
-
-        return request, handler
-
-    def delete_matching(self, filters, limit=None, sync=None):
+    def delete(self, filters, limit=None, sync=None):
         """Delete matching documents from the collection.
 
         :param filters: the filters
         :type filters: dict
-        :param limit: the the maximum number of documents to delete
+        :param limit: the the max number of documents to delete
         :type limit: int
         :param sync: wait for the operation to sync to disk
         :type sync: bool
@@ -1425,3 +1353,129 @@ class Collection(BaseCollection):
             return res.body['deleted']
 
         return request, handler
+
+    def delete_one(self, document, sync=None, ignore_missing=True):
+        """Delete a document from the collection.
+
+        :param document: the document to delete
+        :param sync: wait for the operation to sync to disk
+        :type sync: bool | None
+        :param ignore_missing: ignore missing documents
+        :type ignore_missing: bool
+        :returns: the id, revision and key of the deleted document
+        :rtype: dict
+        :raises: DocumentRevisionError, DocumentDeleteError
+        """
+        _validate_document(document)
+
+        params = {}
+        if sync is not None:
+            params['waitForSync'] = sync
+
+        headers = {}
+        if '_rev' in document:
+            headers['If-Match'] = document['_rev']
+
+        request = Request(
+            method='delete',
+            endpoint='/_api/document/{}/{}'.format(
+                self._name, document['_key']
+            ),
+            params=params,
+            headers=headers
+        )
+
+        def handler(res):
+            if res.status_code == 412:
+                raise DocumentRevisionError(res)
+            elif res.status_code == 404:
+                if ignore_missing:
+                    return None
+                raise DocumentDeleteError(res)
+            elif res.status_code not in HTTP_OK:
+                raise DocumentDeleteError(res)
+            return res.body
+
+        return request, handler
+
+    def delete_many(self, documents, sync=None):
+        """Delete multiple documents from the collection
+
+        :param documents: list of documents to delete
+        :type documents: list
+        :param sync: wait for the operation to sync to disk
+        :type sync: bool | None
+        :returns: the number of documents deleted
+        :rtype: dict
+        :raises: DocumentDeleteError
+        """
+        document_keys = []
+        for document in documents:
+            _validate_document(document)
+            document_keys.append(document['_key'])
+
+        data = {
+            'collection': self._name,
+            'keys': document_keys
+        }
+        if sync is not None:
+            data['waitForSync'] = sync
+
+        request = Request(
+            method='put',
+            endpoint='/_api/simple/remove-by-keys',
+            data=data
+        )
+
+        def handler(res):
+            if res.status_code not in HTTP_OK:
+                raise DocumentDeleteError(res)
+            return res.body
+
+        return request, handler
+
+    def delete_by_keys(self, keys, sync=None):
+        """Delete documents whose keys are in ``keys``.
+
+        :param keys: list of document keys
+        :type keys: list
+        :param sync: wait for the operation to sync to disk
+        :type sync: bool | None
+        :returns: the number of documents deleted
+        :rtype: dict
+        :raises: DocumentDeleteError
+        """
+        data = {'collection': self._name, 'keys': keys}
+        if sync is not None:
+            data['waitForSync'] = sync
+
+        request = Request(
+            method='put',
+            endpoint='/_api/simple/remove-by-keys',
+            data=data
+        )
+
+        def handler(res):
+            if res.status_code not in HTTP_OK:
+                raise DocumentDeleteError(res)
+            return res.body
+
+        return request, handler
+
+
+def _validate_document(document, required_fields=None):
+    """Check if ``document`` contains the fields in ``required_fields``.
+
+    :param document: the document body
+    :type document: dict
+    :param required_fields: list of required field names
+    :type required_fields: list
+    :raises: KeyError
+    """
+    required_fields = required_fields if required_fields else ['_key']
+    missing_fields = [f for f in required_fields if f not in document]
+    if missing_fields:
+        raise KeyError(
+            'The document is missing required fields {}'
+            .format(missing_fields)
+        )

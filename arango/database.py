@@ -147,7 +147,7 @@ class Database(object):
 
         :param name: the name of the collection
         :type name: str
-        :param sync: wait for operations to sync to disk
+        :param sync: wait for the operation to sync to disk
         :type sync: bool
         :param compact: compact the collection
         :type compact: bool

@@ -135,9 +135,9 @@ class BatchExecution(Connection):
                         body=raw_body
                     ))
                 except Exception as err:
-                    job.update(status=BatchJob.Status.ERROR, exception=err)
+                    job.update_one(status=BatchJob.Status.ERROR, exception=err)
                 else:
-                    job.update(status=BatchJob.Status.DONE, result=result)
+                    job.update_one(status=BatchJob.Status.DONE, result=result)
         finally:
             self._requests, self._handlers, self._batch_jobs = [], [], []
 

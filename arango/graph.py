@@ -16,7 +16,7 @@ class Graph(APIWrapper):
     :type name: str
     """
 
-    _internal_methods = {
+    _normal_methods = {
         'vertex_collection', 'v',
         'edge_collection', 'e',
         'name',
@@ -397,7 +397,7 @@ class VertexCollection(BaseCollection):
         :type data: dict
         :param sync: wait for the operation to sync to disk
         :type sync: bool
-        :returns: the ID, revision and the key of the inserted vertex
+        :returns: the ID, revision and key of the inserted vertex
         :rtype: dict
         :raises: VertexInsertError
         """
@@ -524,7 +524,7 @@ class VertexCollection(BaseCollection):
         :type rev: str | None
         :param sync: wait for operation to sync to disk
         :type sync: bool
-        :returns: the ID, rev and key of the replaced vertex
+        :returns: the ID, revision and key of the replaced vertex
         :rtype: dict
         :raises: VertexRevisionError, VertexReplaceError
         """
@@ -567,7 +567,7 @@ class VertexCollection(BaseCollection):
         :type sync: bool
         :param ignore_missing: ignore missing vertex
         :type ignore_missing: bool
-        :returns: the ID, rev and key of the deleted vertex
+        :returns: the ID, revision and key of the deleted vertex
         :rtype: dict
         :raises: VertexRevisionError, VertexDeleteError
         """

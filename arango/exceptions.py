@@ -283,7 +283,7 @@ class DocumentRevisionError(ArangoError):
     """The expected and actual document revisions do not match."""
 
 
-class DocumentGetError(ArangoError):
+class DocumentFetchError(ArangoError):
     """Failed to get the document."""
 
 
