@@ -18,7 +18,7 @@ col = db.create_collection(col_name)
 
 
 def teardown_module(*_):
-    arango_client.drop_database(db_name, ignore_missing=True)
+    arango_client.delete_database(db_name, ignore_missing=True)
 
 
 def setup_function(*_):

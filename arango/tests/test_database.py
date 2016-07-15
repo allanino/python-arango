@@ -23,21 +23,19 @@ db.create_graph(graph_name)
 
 
 def teardown_module(*_):
-    arango_client.drop_database(db_name, ignore_missing=True)
+    arango_client.delete_database(db_name, ignore_missing=True)
 
 
+@pytest.mark.order1
 def test_properties():
     assert db.name == db_name
     assert repr(db) == '<ArangoDB database "{}">'.format(db_name)
 
-
-@pytest.mark.order1
-def test_options():
-    options = db.properties()
-    assert 'id' in options
-    assert 'path' in options
-    assert options['system'] == False
-    assert options['name'] == db_name
+    properties = db.properties()
+    assert 'id' in properties
+    assert 'path' in properties
+    assert properties['system'] == False
+    assert properties['name'] == db_name
 
 
 @pytest.mark.order2
@@ -78,19 +76,19 @@ def test_create_collection():
         shard_count=2,
         shard_fields=["test_attr"]
     )
-    options = col.properties()
-    assert 'id' in options
-    assert options['name'] == col_name_2
-    assert options['sync'] == True
-    assert options['compact'] == False
-    assert options['journal_size'] == 7774208
-    assert options['system'] == False
-    assert options['volatile'] == False
-    assert options['edge'] == True
-    assert options['keygen'] == 'autoincrement'
-    assert options['user_keys'] == False
-    assert options['key_increment'] == 9
-    assert options['key_offset'] == 100
+    properties = col.properties()
+    assert 'id' in properties
+    assert properties['name'] == col_name_2
+    assert properties['sync'] == True
+    assert properties['compact'] == False
+    assert properties['journal_size'] == 7774208
+    assert properties['system'] == False
+    assert properties['volatile'] == False
+    assert properties['edge'] == True
+    assert properties['keygen'] == 'autoincrement'
+    assert properties['user_keys'] == False
+    assert properties['key_increment'] == 9
+    assert properties['key_offset'] == 100
 
 
 @pytest.mark.order5
@@ -111,7 +109,14 @@ def test_drop_collection():
 
 @pytest.mark.order6
 def test_list_graphs():
-    assert db.list_graphs() == [graph_name]
+    graphs = db.graphs()
+    assert len(graphs) == 1
+
+    graph = graphs[0]
+    assert graph['name'] == graph_name
+    assert graph['edge_definitions'] == []
+    assert graph['orphan_collections'] == []
+    assert 'revision' in graph
 
 
 @pytest.mark.order7
@@ -129,7 +134,7 @@ def test_create_graph():
 
     new_graph_name = generate_graph_name(db)
     db.create_graph(new_graph_name)
-    assert new_graph_name in db.list_graphs()
+    assert new_graph_name in [g['name'] for g in db.graphs()]
 
 
 @pytest.mark.order9
@@ -137,7 +142,7 @@ def test_drop_graph():
     # Test drop graph
     result = db.delete_graph(graph_name)
     assert result is True
-    assert graph_name not in db.list_graphs()
+    assert graph_name not in db.graphs()
 
     # Test drop missing graph
     with pytest.raises(GraphDeleteError):

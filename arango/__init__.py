@@ -351,7 +351,7 @@ class ArangoClient(object):
     # Database Management #
     #######################
 
-    def databases(self, user_only=False):
+    def list_databases(self, user_only=False):
         """"Return the database names.
 
         :param user_only: list only the databases accessible by the user
@@ -407,8 +407,8 @@ class ArangoClient(object):
             raise DatabaseCreateError(res)
         return self.db(name)
 
-    def drop_database(self, name, ignore_missing=False):
-        """Drop the database of the specified name.
+    def delete_database(self, name, ignore_missing=False):
+        """Delete the database of the specified name.
 
         :param name: the name of the database to delete
         :type name: str
@@ -428,7 +428,7 @@ class ArangoClient(object):
     # User Management #
     ###################
 
-    def users(self):
+    def list_users(self):
         """Return details on all users.
 
         :returns: the mapping of usernames to user details

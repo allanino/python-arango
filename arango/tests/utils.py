@@ -13,7 +13,7 @@ def generate_db_name(client):
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(client.databases())
+    existing = set(client.list_databases())
     while "test_database_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_database_{num:06d}".format(num=num)
@@ -43,7 +43,7 @@ def generate_graph_name(database):
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(database.list_graphs())
+    existing = set(g['name'] for g in database.graphs())
     while "test_graph_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_graph_{num:06d}".format(num=num)
@@ -73,7 +73,7 @@ def generate_user_name(client):
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(client.users())
+    existing = set(client.list_users())
     while "test_user_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_user_{num:06d}".format(num=num)

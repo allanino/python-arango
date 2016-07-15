@@ -23,16 +23,16 @@ task_id = ''
 
 
 def teardown_module(*_):
-    arango_client.drop_database(db_name, ignore_missing=True)
+    arango_client.delete_database(db_name, ignore_missing=True)
     arango_client.delete_user(username, ignore_missing=True)
     if task_id:
         arango_client.delete_task(task_id, ignore_missing=True)
 
 
 def test_properties():
-    assert arango_client._protocol == 'http'
-    assert arango_client._host == 'localhost'
-    assert arango_client._port == 8529
+    assert arango_client.protocol == 'http'
+    assert arango_client.host == 'localhost'
+    assert arango_client.port == 8529
     assert 'ArangoDB client pointing to' in repr(arango_client)
 
 
@@ -92,14 +92,6 @@ def test_sleep():
     assert arango_client.sleep(2) == 2
 
 
-# def test_shutdown():
-#     assert isinstance(conn.shutdown(), bool)
-
-
-# def test_run_tests():
-#     assert isinstance(conn.run_tests, dict)
-
-
 def test_execute():
     assert arango_client.execute('return 1') == '1'
     assert arango_client.execute('return "test"') == '"test"'
@@ -132,18 +124,16 @@ def test_endpoints():
 def test_database_management():
     # Test list databases
     # TODO something wrong here
-    result = arango_client.databases()
+    result = arango_client.list_databases()
     assert '_system' in result
-
-    result = arango_client.databases(user_only=True)
+    result = arango_client.list_databases(user_only=True)
     assert '_system' in result
-
-    assert db_name not in arango_client.databases()
+    assert db_name not in arango_client.list_databases()
 
     # Test create database
     result = arango_client.create_database(db_name)
     assert isinstance(result, Database)
-    assert db_name in arango_client.databases()
+    assert db_name in arango_client.list_databases()
 
     # Test get after create database
     assert isinstance(arango_client.db(db_name), Database)
@@ -154,25 +144,25 @@ def test_database_management():
         arango_client.create_database(db_name)
 
     # Test list after create database
-    assert db_name in arango_client.databases()
+    assert db_name in arango_client.list_databases()
 
-    # Test drop database
-    result = arango_client.drop_database(db_name)
+    # Test delete database
+    result = arango_client.delete_database(db_name)
     assert result is True
-    assert db_name not in arango_client.databases()
+    assert db_name not in arango_client.list_databases()
 
-    # Test drop missing database
+    # Test delete missing database
     with pytest.raises(DatabaseDeleteError):
-        arango_client.drop_database(db_name)
+        arango_client.delete_database(db_name)
 
-    # Test drop missing database (ignore missing)
-    result = arango_client.drop_database(db_name, ignore_missing=True)
+    # Test delete missing database (ignore missing)
+    result = arango_client.delete_database(db_name, ignore_missing=True)
     assert result is False
 
 
 def test_user_management():
     # Test get users
-    users = arango_client.users()
+    users = arango_client.list_users()
     assert isinstance(users, dict)
     assert 'root' in users
 
@@ -181,7 +171,7 @@ def test_user_management():
     assert 'extra'in root_user
     assert 'change_password' in root_user
 
-    assert username not in arango_client.users()
+    assert username not in arango_client.list_users()
 
     # Test create user
     user = arango_client.create_user(
@@ -194,7 +184,7 @@ def test_user_management():
     assert user['active'] is True
     assert user['extra'] == {'hello': 'world'}
     assert user['change_password'] is False
-    assert username in arango_client.users()
+    assert username in arango_client.list_users()
 
     # Test create duplicate user
     with pytest.raises(UserCreateError):
@@ -263,7 +253,7 @@ def test_user_management():
     # Test delete user
     result = arango_client.delete_user(username)
     assert result is True
-    assert username not in arango_client.users()
+    assert username not in arango_client.list_users()
 
     # Test delete missing user
     with pytest.raises(UserDeleteError):

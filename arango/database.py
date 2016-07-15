@@ -225,7 +225,7 @@ class Database(object):
     # Graph Management #
     ####################
 
-    def list_graphs(self):
+    def graphs(self):
         """List all graphs in the database.
 
         :returns: the graphs in the database
@@ -240,7 +240,7 @@ class Database(object):
                 'name': graph['_key'],
                 'revision': graph['_rev'],
                 'edge_definitions': graph['edgeDefinitions'],
-                'orphan_collections': graph['orphan_collections']
+                'orphan_collections': graph['orphanCollections']
             } for graph in res.body['graphs']
         ]
 

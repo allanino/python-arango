@@ -1,6 +1,6 @@
 {
   "arango/tests/test_collection.py::test_delete": true, 
-  "arango/tests/test_collection.py::test_rename": true, 
-  "arango/tests/test_collection.py::test_set_options": true, 
-  "arango/tests/test_collection.py::test_truncate": true
+  "arango/tests/test_collection.py::test_find_text": true, 
+  "arango/tests/test_collection.py::test_replace_one": true, 
+  "arango/tests/test_collection.py::test_update_one": true
 }

@@ -31,7 +31,7 @@ edge4 = {'_key': '4', '_from': '{}/4'.format(col), '_to': '{}/1'.format(col)}
 
 
 def teardown_module(*_):
-    arango_client.drop_database(db_name, ignore_missing=True)
+    arango_client.delete_database(db_name, ignore_missing=True)
 
 
 def setup_function(*_):
@@ -42,30 +42,28 @@ def test_properties():
     assert ecol.name == ecol_name
     assert repr(ecol) == ("<ArangoDB collection '{}'>".format(ecol_name))
 
-
-def test_options():
-    options = ecol.properties()
-    assert 'id' in options
-    assert options['status'] in Collection.STATUSES.values()
-    assert options['name'] == ecol_name
-    assert options['edge'] == True
-    assert options['system'] == False
-    assert isinstance(options['sync'], bool)
-    assert isinstance(options['compact'], bool)
-    assert isinstance(options['volatile'], bool)
-    assert isinstance(options['journal_size'], int)
-    assert options['keygen'] in ('autoincrement', 'traditional')
-    assert isinstance(options['user_keys'], bool)
-    if 'key_increment' in options:
-        assert isinstance(options['key_increment'], int)
-    if 'key_offset' in options:
-        assert isinstance(options['key_offset'], int)
+    properties = ecol.properties()
+    assert 'id' in properties
+    assert properties['status'] in Collection.STATUSES.values()
+    assert properties['name'] == ecol_name
+    assert properties['edge'] == True
+    assert properties['system'] == False
+    assert isinstance(properties['sync'], bool)
+    assert isinstance(properties['compact'], bool)
+    assert isinstance(properties['volatile'], bool)
+    assert isinstance(properties['journal_size'], int)
+    assert properties['keygen'] in ('autoincrement', 'traditional')
+    assert isinstance(properties['user_keys'], bool)
+    if 'key_increment' in properties:
+        assert isinstance(properties['key_increment'], int)
+    if 'key_offset' in properties:
+        assert isinstance(properties['key_offset'], int)
 
 
-def test_set_options():
-    options = ecol.properties()
-    old_sync = options['sync']
-    old_journal_size = options['journal_size']
+def test_set_properties():
+    properties = ecol.properties()
+    old_sync = properties['sync']
+    old_journal_size = properties['journal_size']
 
     new_sync = not old_sync
     new_journal_size = old_journal_size + 1
@@ -73,9 +71,9 @@ def test_set_options():
         sync=new_sync, journal_size=new_journal_size
     )
     assert isinstance(result, bool)
-    new_options = ecol.properties()
-    assert new_options['sync'] == new_sync
-    assert new_options['journal_size'] == new_journal_size
+    new_properties = ecol.properties()
+    assert new_properties['sync'] == new_sync
+    assert new_properties['journal_size'] == new_journal_size
 
 
 def test_rename():

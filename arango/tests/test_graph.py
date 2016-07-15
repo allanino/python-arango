@@ -21,7 +21,7 @@ graph = db.create_graph(graph_name)
 
 
 def teardown_module(*_):
-    arango_client.drop_database(db_name, ignore_missing=True)
+    arango_client.delete_database(db_name, ignore_missing=True)
 
 
 def setup_function(*_):
@@ -34,48 +34,44 @@ def test_properties():
     assert repr(graph) == (
         "<ArangoDB graph '{}'>".format(graph_name)
     )
+    properties = graph.properties()
+    assert properties['id'] == '_graphs/{}'.format(graph_name)
+    assert properties['name'] == graph_name
+    assert properties['revision'].isdigit()
 
 
 @pytest.mark.order2
-def test_options():
-    options = graph.properties()
-    assert options['id'] == '_graphs/{}'.format(graph_name)
-    assert options['name'] == graph_name
-    assert options['revision'].isdigit()
-
-
-@pytest.mark.order3
 def test_create_vertex_collection():
-    assert graph.get_vertex_collections() == []
+    assert graph.vertex_collections() == []
     assert graph.create_vertex_collection('vcol1') == True
-    assert graph.get_vertex_collections() == ['vcol1']
-    assert graph.get_orphan_collections() == ['vcol1']
+    assert graph.vertex_collections() == ['vcol1']
+    assert graph.orphan_collections() == ['vcol1']
     assert 'vcol1' in db.list_collections()
 
     # Test create duplicate vertex collection
     with pytest.raises(VertexCollectionCreateError):
         graph.create_vertex_collection('vcol1')
-    assert graph.get_vertex_collections() == ['vcol1']
-    assert graph.get_orphan_collections() == ['vcol1']
+    assert graph.vertex_collections() == ['vcol1']
+    assert graph.orphan_collections() == ['vcol1']
     assert 'vcol1' in db.list_collections()
 
     assert graph.create_vertex_collection('vcol2') == True
-    assert sorted(graph.get_vertex_collections()) == ['vcol1', 'vcol2']
-    assert graph.get_orphan_collections() == ['vcol1', 'vcol2']
+    assert sorted(graph.vertex_collections()) == ['vcol1', 'vcol2']
+    assert graph.orphan_collections() == ['vcol1', 'vcol2']
     assert 'vcol1' in db.list_collections()
     assert 'vcol2' in db.list_collections()
 
 
-@pytest.mark.order4
+@pytest.mark.order3
 def test_list_vertex_collections():
-    assert graph.get_vertex_collections() == ['vcol1', 'vcol2']
+    assert graph.vertex_collections() == ['vcol1', 'vcol2']
 
 
-@pytest.mark.order5
+@pytest.mark.order4
 def test_delete_vertex_collection():
-    assert sorted(graph.get_vertex_collections()) == ['vcol1', 'vcol2']
+    assert sorted(graph.vertex_collections()) == ['vcol1', 'vcol2']
     assert graph.delete_vertex_collection('vcol1') == True
-    assert graph.get_vertex_collections() == ['vcol2']
+    assert graph.vertex_collections() == ['vcol2']
     assert 'vcol1' in db.list_collections()
 
     # Test delete missing vertex collection
@@ -83,16 +79,16 @@ def test_delete_vertex_collection():
         graph.delete_vertex_collection('vcol1')
 
     assert graph.delete_vertex_collection('vcol2', purge=True) == True
-    assert graph.get_vertex_collections() == []
+    assert graph.vertex_collections() == []
     assert 'vcol1' in db.list_collections()
     assert 'vcol2' not in db.list_collections()
 
 
-@pytest.mark.order6
+@pytest.mark.order5
 def test_create_edge_definition():
-    assert graph.get_edge_collections() == []
+    assert graph.edge_collections() == []
     assert graph.create_edge_collection('ecol1', [], []) == True
-    assert graph.get_edge_collections() == [{
+    assert graph.edge_collections() == [{
         'name': 'ecol1',
         'from_collections': [],
         'to_collections': []
@@ -102,7 +98,7 @@ def test_create_edge_definition():
     # Test create duplicate edge definition
     with pytest.raises(EdgeDefinitionCreateError):
         assert graph.create_edge_collection('ecol1', [], [])
-    assert graph.get_edge_collections() == [{
+    assert graph.edge_collections() == [{
         'name': 'ecol1',
         'from_collections': [],
         'to_collections': []
@@ -112,7 +108,7 @@ def test_create_edge_definition():
     assert graph.create_vertex_collection('vcol1') == True
     assert graph.create_vertex_collection('vcol2') == True
     assert graph.create_edge_collection('ecol2', ['vcol1'], ['vcol2']) == True
-    assert graph.get_edge_collections() == [
+    assert graph.edge_collections() == [
         {
             'name': 'ecol1',
             'from_collections': [],
@@ -128,7 +124,7 @@ def test_create_edge_definition():
 
     # Test create edge definition with missing vertex collection
     assert graph.create_edge_collection('ecol3', ['vcol3'], ['vcol3']) == True
-    assert graph.get_edge_collections() == [
+    assert graph.edge_collections() == [
         {
             'name': 'ecol1',
             'from_collections': [],
@@ -145,15 +141,15 @@ def test_create_edge_definition():
             'to_collections': ['vcol3']
         }
     ]
-    assert 'vcol3' in graph.get_vertex_collections()
-    assert 'vcol3' not in graph.get_orphan_collections()
+    assert 'vcol3' in graph.vertex_collections()
+    assert 'vcol3' not in graph.orphan_collections()
     assert 'vcol3' in db.list_collections()
     assert 'ecol3' in db.list_collections()
 
 
-@pytest.mark.order7
+@pytest.mark.order6
 def test_list_edge_definitions():
-    assert graph.get_edge_collections() == [
+    assert graph.edge_collections() == [
         {
             'name': 'ecol1',
             'from_collections': [],
@@ -172,15 +168,15 @@ def test_list_edge_definitions():
     ]
 
 
-@pytest.mark.order8
+@pytest.mark.order7
 def test_replace_edge_definition():
     assert graph.replace_edge_collection(
         name='ecol1',
         from_collections=['vcol3'],
         to_collections=['vcol2']
     ) == True
-    assert graph.get_orphan_collections() == ['vcol1']
-    assert graph.get_edge_collections() == [
+    assert graph.orphan_collections() == ['vcol1']
+    assert graph.edge_collections() == [
         {
             'name': 'ecol1',
             'from_collections': ['vcol3'],
@@ -202,8 +198,8 @@ def test_replace_edge_definition():
         from_collections=['vcol1'],
         to_collections=[]
     ) == True
-    assert graph.get_orphan_collections() == []
-    assert 'vcol3' not in graph.get_orphan_collections()
+    assert graph.orphan_collections() == []
+    assert 'vcol3' not in graph.orphan_collections()
     assert graph.replace_edge_collection(
         name='ecol3',
         from_collections=['vcol4'],
@@ -215,7 +211,7 @@ def test_replace_edge_definition():
             from_collections=[],
             to_collections=['vcol1']
         )
-    assert graph.get_edge_collections() == [
+    assert graph.edge_collections() == [
         {
             'name': 'ecol1',
             'from_collections': ['vcol3'],
@@ -232,13 +228,13 @@ def test_replace_edge_definition():
             'to_collections': ['vcol4']
         }
     ]
-    assert graph.get_orphan_collections() == []
+    assert graph.orphan_collections() == []
 
 
-@pytest.mark.order9
+@pytest.mark.order8
 def test_delete_edge_definition():
     assert graph.delete_edge_collection('ecol3') == True
-    assert graph.get_edge_collections() == [
+    assert graph.edge_collections() == [
         {
             'name': 'ecol1',
             'from_collections': ['vcol3'],
@@ -250,8 +246,8 @@ def test_delete_edge_definition():
             'to_collections': []
         }
     ]
-    assert graph.get_orphan_collections() == ['vcol4']
-    assert 'vcol4' in graph.get_vertex_collections()
+    assert graph.orphan_collections() == ['vcol4']
+    assert 'vcol4' in graph.vertex_collections()
     assert 'vcol4' in db.list_collections()
     assert 'ecol3' in db.list_collections()
 
@@ -259,20 +255,20 @@ def test_delete_edge_definition():
         graph.delete_edge_collection('ecol3')
 
     assert graph.delete_edge_collection('ecol1', purge=True) == True
-    assert graph.get_edge_collections() == [
+    assert graph.edge_collections() == [
         {
             'name': 'ecol2',
             'from_collections': ['vcol1'],
             'to_collections': []
         }
     ]
-    assert sorted(graph.get_orphan_collections()) == ['vcol2', 'vcol3', 'vcol4']
+    assert sorted(graph.orphan_collections()) == ['vcol2', 'vcol3', 'vcol4']
     assert 'ecol1' not in db.list_collections()
     assert 'ecol2' in db.list_collections()
     assert 'ecol3' in db.list_collections()
 
 
-@pytest.mark.order10
+@pytest.mark.order9
 def test_insert_vertex():
     vcol = graph.vertex_collection('vcol1')
     vertex1 = {'_key': '1', 'value': 1}
@@ -301,7 +297,7 @@ def test_insert_vertex():
         assert vcol.insert_one(vertex2)
 
 
-@pytest.mark.order11
+@pytest.mark.order10
 def test_get_vertex():
     vcol = graph.vertex_collection('vcol1')
     vertex1 = {'_key': '1', 'value': 1}
@@ -323,7 +319,7 @@ def test_get_vertex():
     assert clean_keys(vcol.fetch_by_key('2')) == vertex2
 
 
-@pytest.mark.order12
+@pytest.mark.order11
 def test_update_vertex():
     vcol = graph.vertex_collection('vcol1')
     assert 'foo' not in vcol.fetch_by_key('1')
@@ -370,7 +366,7 @@ def test_update_vertex():
     assert 'foo' not in vcol.fetch_by_key('1')
 
 
-@pytest.mark.order13
+@pytest.mark.order12
 def test_replace_vertex():
     vcol = graph.vertex_collection('vcol1')
 
@@ -412,7 +408,7 @@ def test_replace_vertex():
     assert vcol.fetch_by_key('1')['bar'] == 400
 
 
-@pytest.mark.order14
+@pytest.mark.order13
 def test_delete_vertex():
     vcol = graph.vertex_collection('vcol1')
     vcol.truncate()
@@ -421,12 +417,12 @@ def test_delete_vertex():
     vcol.insert_one({'_key': '3', 'value': 3})
 
     # Test vertex delete
-    assert vcol.clear('1') == True
+    assert vcol.delete_one('1') == True
     assert vcol.fetch_by_key('1') is None
     assert '1' not in vcol
 
     # Test vertex delete with sync
-    assert vcol.clear('3', sync=True) == True
+    assert vcol.delete_one('3', sync=True) == True
     assert vcol.fetch_by_key('3') is None
     assert '3' not in vcol
 
@@ -446,32 +442,32 @@ def test_delete_vertex():
         vcol.clear('10', ignore_missing=False)
 
 
-@pytest.mark.order15
+@pytest.mark.order14
 def test_insert_edge():
     ecol = db.collection('ecol2')
     ecol.truncate()
 
 
-@pytest.mark.order16
+@pytest.mark.order15
 def test_get_edge():
     pass
 
 
-@pytest.mark.order17
+@pytest.mark.order16
 def test_update_edge():
     pass
 
 
-@pytest.mark.order18
+@pytest.mark.order17
 def test_replace_edge():
     pass
 
 
-@pytest.mark.order19
+@pytest.mark.order18
 def test_delete_edge():
     pass
 
 
-@pytest.mark.order20
+@pytest.mark.order19
 def test_traverse():
     pass

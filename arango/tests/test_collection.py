@@ -21,7 +21,7 @@ col.add_geo_index(['coordinates'])
 
 
 def teardown_module(*_):
-    arango_client.drop_database(db_name, ignore_missing=True)
+    arango_client.delete_database(db_name, ignore_missing=True)
 
 
 def setup_function(*_):
@@ -33,41 +33,40 @@ def test_properties():
     assert repr(col) == (
         "<ArangoDB collection '{}'>".format(col_name)
     )
+    properties = col.properties()
+    assert 'id' in properties
+    assert properties['status'] in Collection.STATUSES.values()
+    assert properties['name'] == col_name
+    assert properties['edge'] == False
+    assert properties['system'] == False
+    assert isinstance(properties['sync'], bool)
+    assert isinstance(properties['compact'], bool)
+    assert isinstance(properties['volatile'], bool)
+    assert isinstance(properties['journal_size'], int)
+    assert properties['keygen'] in ('autoincrement', 'traditional')
+    assert isinstance(properties['user_keys'], bool)
+    if 'key_increment' in properties:
+        assert isinstance(properties['key_increment'], int)
+    if 'key_offset' in properties:
+        assert isinstance(properties['key_offset'], int)
 
 
-def test_options():
-    options = col.properties()
-    assert 'id' in options
-    assert options['status'] in Collection.STATUSES.values()
-    assert options['name'] == col_name
-    assert options['edge'] == False
-    assert options['system'] == False
-    assert isinstance(options['sync'], bool)
-    assert isinstance(options['compact'], bool)
-    assert isinstance(options['volatile'], bool)
-    assert isinstance(options['journal_size'], int)
-    assert options['keygen'] in ('autoincrement', 'traditional')
-    assert isinstance(options['user_keys'], bool)
-    if 'key_increment' in options:
-        assert isinstance(options['key_increment'], int)
-    if 'key_offset' in options:
-        assert isinstance(options['key_offset'], int)
-
-
-def test_set_options():
-    options = col.properties()
-    old_sync = options['sync']
-    old_journal_size = options['journal_size']
+def test_set_properties():
+    properties = col.properties()
+    old_sync = properties['sync']
+    old_journal_size = properties['journal_size']
 
     new_sync = not old_sync
     new_journal_size = old_journal_size + 1
     result = col.set_properties(
         sync=new_sync, journal_size=new_journal_size
     )
-    assert isinstance(result, bool)
-    new_options = col.properties()
-    assert new_options['sync'] == new_sync
-    assert new_options['journal_size'] == new_journal_size
+    assert result['sync'] == new_sync
+    assert result['journal_size'] == new_journal_size
+
+    new_properties = col.properties()
+    assert new_properties['sync'] == new_sync
+    assert new_properties['journal_size'] == new_journal_size
 
 
 def test_rename():
@@ -75,7 +74,7 @@ def test_rename():
     new_name = generate_col_name(db)
 
     result = col.rename(new_name)
-    assert result is True
+    assert result['name'] == new_name
     assert col.name == new_name
     assert repr(col) == (
         "<ArangoDB collection '{}'>".format(new_name)
@@ -83,7 +82,7 @@ def test_rename():
 
     # Try again (the operation should be idempotent)
     result = col.rename(new_name)
-    assert result is True
+    assert result['name'] == new_name
     assert col.name == new_name
     assert repr(col) == (
         "<ArangoDB collection '{}'>".format(new_name)
@@ -139,11 +138,14 @@ def test_truncate():
     assert len(col) > 1
 
     result = col.truncate()
-    assert isinstance(result, bool)
+    assert 'id' in result
+    assert 'name' in result
+    assert 'status' in result
+    assert 'is_system' in result
     assert len(col) == 0
 
 
-def test_insert():
+def test_insert_one():
     for i in range(1, 6):
         doc = col.insert_one({'_key': str(i), 'foo': i * 100})
         assert doc['_id'] == '{}/{}'.format(col.name, str(i))
@@ -208,7 +210,7 @@ def test_insert_many():
     assert 'details' not in result
 
 
-def test_get():
+def test_fetch_by_key():
     col.insert_one({'_key': '1', 'foo': 100})
     doc = col.fetch_by_key('1')
     assert doc['foo'] == 100
@@ -223,7 +225,7 @@ def test_get():
         col.fetch_by_key('1', rev=new_rev)
 
 
-def test_get_many():
+def test_fetch_by_keys():
     assert col.fetch_by_keys(['1', '2', '3', '4', '5']) == []
     expected = [
         {'_key': '1', 'foo': 100},
@@ -244,8 +246,13 @@ def test_get_many():
         ]
 
 
-def test_update():
-    col.insert_one({'_key': '1', 'foo': 100})
+def test_update_one():
+    doc = {'_key': '1', 'foo': 100}
+
+    result = col.insert_one(doc)
+    print(result)
+
+
     assert col['1']['foo'] == 100
 
     doc = col.update_one('1', {'foo': 200})
@@ -285,7 +292,7 @@ def test_update():
     assert 'foo' not in col['1']
 
 
-def test_replace():
+def test_replace_one():
     doc = col.insert_one({'_key': '1', 'foo': 100})
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'

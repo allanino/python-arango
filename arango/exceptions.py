@@ -6,35 +6,35 @@ from arango.response import Response
 class ArangoError(Exception):
     """Base class for ArangoDB request errors.
 
-    :param response: the response object or string
-    :type response: arango.response.Response | str
+    :param data: the response object or string
+    :type data: arango.response.Response | str
     """
 
-    def __init__(self, response):
-        if isinstance(response, Response):
+    def __init__(self, data):
+        if isinstance(data, Response):
             # Get the ArangoDB error message if given
-            if response.body is not None and "errorMessage" in response.body:
-                message = response.body["errorMessage"]
-            elif response.status_text is not None:
-                message = response.status_text
+            if data.body is not None and "errorMessage" in data.body:
+                message = data.body["errorMessage"]
+            elif data.status_text is not None:
+                message = data.status_text
             else:
                 message = "request failed"
 
             # Get the ArangoDB error number if given
-            if response.body is not None and "errorNum" in response.body:
-                self.error_code = response.body["errorNum"]
+            if data.body is not None and "errorNum" in data.body:
+                self.error_code = data.body["errorNum"]
             else:
                 self.error_code = None
 
             # Generate the error message for the exception
             super(ArangoError, self).__init__(message)
             self.message = message
-            self.method = response.method
-            self.url = response.url
-            self.http_code = response.status_code
+            self.method = data.method
+            self.url = data.url
+            self.http_code = data.status_code
         else:
-            super(ArangoError, self).__init__(response)
-            self.message = response
+            super(ArangoError, self).__init__(data)
+            self.message = data
             self.error_code = None
             self.method = None
             self.url = None

@@ -21,7 +21,7 @@ func_body = ''
 
 
 def teardown_module(*_):
-    arango_client.drop_database(db_name, ignore_missing=True)
+    arango_client.delete_database(db_name, ignore_missing=True)
 
 
 @pytest.mark.order1
@@ -147,23 +147,23 @@ def test_query_function_delete_and_list():
 
 
 @pytest.mark.order6
-def test_get_query_cache_options():
-    options = db.query.cache.properties()
-    assert 'mode' in options
-    assert 'limit' in options
+def test_get_query_cache_properties():
+    properties = db.query.cache.properties()
+    assert 'mode' in properties
+    assert 'limit' in properties
 
 
 @pytest.mark.order7
-def test_set_query_cache_options():
-    options = db.query.cache.update_one(
+def test_set_query_cache_properties():
+    properties = db.query.cache.set_properties(
         mode='on', limit=100
     )
-    assert options['mode'] == 'on'
-    assert options['limit'] == 100
+    assert properties['mode'] == 'on'
+    assert properties['limit'] == 100
 
-    options = db.query.cache.properties()
-    assert options['mode'] == 'on'
-    assert options['limit'] == 100
+    properties = db.query.cache.properties()
+    assert properties['mode'] == 'on'
+    assert properties['limit'] == 100
 
 
 @pytest.mark.order8
