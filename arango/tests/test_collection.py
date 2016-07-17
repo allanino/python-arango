@@ -148,8 +148,9 @@ def test_truncate():
 def test_insert_one():
     for i in range(1, 6):
         doc = col.insert_one({'_key': str(i), 'foo': i * 100})
-        assert doc['_id'] == '{}/{}'.format(col.name, str(i))
         assert doc['_key'] == str(i)
+        assert doc['_id'] == '{}/{}'.format(col.name, str(i))
+        assert doc['_rev'].isdigit()
 
     assert len(col) == 5
     for key in range(1, 6):
@@ -239,122 +240,130 @@ def test_fetch_by_keys():
     assert expected == [
         {'_key': doc['_key'], 'foo': doc['foo']}
         for doc in col.fetch_by_keys(['1', '2', '3', '4', '5'])
-        ]
+    ]
     assert expected == [
         {'_key': doc['_key'], 'foo': doc['foo']}
         for doc in col.fetch_by_keys(['1', '2', '3', '4', '5', '6'])
-        ]
+    ]
 
 
 def test_update_one():
     doc = {'_key': '1', 'foo': 100}
+    col.insert_one(doc)
 
-    result = col.insert_one(doc)
-    print(result)
-
-
-    assert col['1']['foo'] == 100
-
-    doc = col.update_one('1', {'foo': 200})
+    doc['foo'] = 200
+    doc = col.update_one(doc)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
+    assert doc['_rev'].isdigit()
     assert col['1']['foo'] == 200
 
-    doc = col.update_one('1', {'foo': None}, keep_none=True)
+    doc['foo'] = None
+    doc = col.update_one(doc, keep_none=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
+    assert doc['_rev'].isdigit()
     assert col['1']['foo'] is None
-    
-    doc = col.update_one('1', {'foo': {'bar': 1}}, sync=True)
+
+    doc['foo'] = {'bar': 1}
+    doc = col.update_one(doc, sync=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
+    assert doc['_rev'].isdigit()
     assert col['1']['foo'] == {'bar': 1}
 
-    doc = col.update_one('1', {'foo': {'baz': 2}}, merge=True)
+    doc['foo'] = {'baz': 2}
+    doc = col.update_one(doc, merge=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
+    assert doc['_rev'].isdigit()
     assert col['1']['foo'] == {'bar': 1, 'baz': 2}
 
-    doc = col.update_one('1', {'foo': None}, keep_none=False)
+    doc['foo'] = None
+    doc = col.update_one(doc, keep_none=False)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
+    assert doc['_rev'].isdigit()
     assert 'foo' not in col['1']
 
-    old_rev = doc['_rev']
-    new_rev = str(int(old_rev) + 1)
-
+    doc['foo'] = 300
+    doc['_rev'] = str(int(doc['_rev']) + 1)
     with pytest.raises(DocumentRevisionError):
-        col.update_one('1', {'foo': 300, '_rev': new_rev})
+        col.update_one(doc)
     assert 'foo' not in col['1']
 
     with pytest.raises(DocumentUpdateError):
-        col.update_one('2', {'foo': 300})
+        col.update_one({'_key': '2', 'foo': 300})
     assert 'foo' not in col['1']
 
 
 def test_replace_one():
-    doc = col.insert_one({'_key': '1', 'foo': 100})
-    assert doc['_id'] == '{}/1'.format(col.name)
-    assert doc['_key'] == '1'
-    assert col['1']['foo'] == 100
+    doc = {'_key': '1', 'foo': 100}
+    col.insert_one(doc)
 
-    doc = col.replace_one('1', {'foo': 200})
+    doc['foo'] = 200
+    doc = col.replace_one(doc)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
+    assert doc['_rev'].isdigit()
     assert col['1']['foo'] == 200
 
-    doc = col.replace_one('1', {'foo': 300}, sync=True)
+    doc['foo'] = 300
+    doc = col.replace_one(doc, sync=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
+    assert doc['_rev'].isdigit()
     assert col['1']['foo'] == 300
 
-    doc = col.replace_one('1', {'foo': 400}, rev=doc['_rev'])
+    doc['foo'] = 400
+    del doc['_rev']
+    doc = col.replace_one(doc)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
+    assert doc['_rev'].isdigit()
     assert col['1']['foo'] == 400
 
-    old_rev = doc['_rev']
-    new_rev = str(int(old_rev) + 1)
-
+    doc['foo'] = 500
+    doc['_rev'] = str(int(doc['_rev']) + 1)
     with pytest.raises(DocumentRevisionError):
-        col.replace_one('1', {'foo': 500, '_rev': new_rev})
+        col.replace_one(doc)
     assert col['1']['foo'] == 400
 
     with pytest.raises(DocumentReplaceError):
-        col.replace_one('2', {'foo': 600})
+        col.replace_one({'_key': '2', 'foo': 600})
     assert col['1']['foo'] == 400
 
 
-def test_delete():
-    col.insert_many([
-        {'_key': '1', 'foo': 100},
-        {'_key': '2', 'foo': 200},
-        {'_key': '3', 'foo': 300},
-    ])
+def test_delete_one():
+    doc1 = {'_key': '1', 'foo': 100}
+    doc2 = {'_key': '2', 'foo': 200}
+    doc3 = {'_key': '3', 'foo': 300}
+    doc4 = {'_key': '4', 'foo': 300}
+    col.insert_many([doc1, doc2, doc3])
 
-    doc = col.delete_one('1')
-    assert doc['id'] == '{}/1'.format(col.name)
-    assert doc['key'] == '1'
+    result = col.delete_one(doc1)
+    assert result['_id'] == '{}/1'.format(col.name)
+    assert result['_key'] == '1'
+    assert result['_rev'].isdigit()
     assert '1' not in col
     assert len(col) == 2
 
-    doc = col.delete_one('2', sync=True)
-    assert doc['id'] == '{}/2'.format(col.name)
-    assert doc['key'] == '2'
+    result = col.delete_one(doc2, sync=True)
+    assert result['_id'] == '{}/2'.format(col.name)
+    assert result['_key'] == '2'
+    assert result['_rev'].isdigit()
     assert '2' not in col
     assert len(col) == 1
 
-    old_rev = col['3']['_rev']
-    new_rev = str(int(old_rev) + 1)
-
+    doc3['_rev'] = str(int(col['3']['_rev']) + 1)
     with pytest.raises(DocumentRevisionError):
-        col.delete_one('3', rev=new_rev)
+        col.delete_one(doc3)
     assert '3' in col
     assert len(col) == 1
 
-    assert col.delete_one('4') == False
+    assert col.delete_one(doc4, ignore_missing=True) is None
     with pytest.raises(DocumentDeleteError):
-        col.delete_one('4', ignore_missing=False)
+        col.delete_one(doc4, ignore_missing=False)
     assert len(col) == 1
 
 
@@ -693,7 +702,7 @@ def test_list_indexes():
         'fields': ['_key'],
         'unique': True
     }
-    indexes = col.list_indexes()
+    indexes = col.indexes()
     assert isinstance(indexes, dict)
     assert expected_index in indexes.values()
 
@@ -707,7 +716,7 @@ def test_add_hash_index():
         'fields': ['attr1', 'attr2'],
         'unique': True
     }
-    assert expected_index in col.list_indexes().values()
+    assert expected_index in col.indexes().values()
 
 
 def test_add_skiplist_index():
@@ -718,7 +727,7 @@ def test_add_skiplist_index():
         'fields': ['attr1', 'attr2'],
         'unique': True
     }
-    assert expected_index in col.list_indexes().values()
+    assert expected_index in col.indexes().values()
 
 
 def test_add_geo_index():
@@ -736,7 +745,7 @@ def test_add_geo_index():
         'ignore_none': True,
         'constraint': False
     }
-    assert expected_index in col.list_indexes().values()
+    assert expected_index in col.indexes().values()
 
     # With two attributes
     col.add_geo_index(
@@ -751,7 +760,7 @@ def test_add_geo_index():
         'ignore_none': True,
         'constraint': False
     }
-    assert expected_index in col.list_indexes().values()
+    assert expected_index in col.indexes().values()
 
     # With more than two attributes (should fail)
     with pytest.raises(IndexCreateError):
@@ -774,18 +783,18 @@ def test_add_fulltext_index():
         'min_length': 10,
         'unique': False,
     }
-    assert expected_index in col.list_indexes().values()
+    assert expected_index in col.indexes().values()
 
 
 def test_delete_index():
-    old_indexes = set(col.list_indexes())
+    old_indexes = set(col.indexes())
     col.add_hash_index(['attr1', 'attr2'], unique=True)
     col.add_skiplist_index(['attr1', 'attr2'], unique=True)
     col.add_fulltext_index(fields=['attr1'], minimum_length=10)
 
-    new_indexes = set(col.list_indexes())
+    new_indexes = set(col.indexes())
     assert new_indexes.issuperset(old_indexes)
 
     for index_id in new_indexes - old_indexes:
         col.delete_index(index_id)
-    assert set(col.list_indexes()) == old_indexes
+    assert set(col.indexes()) == old_indexes

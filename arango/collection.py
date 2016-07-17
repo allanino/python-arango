@@ -881,7 +881,7 @@ class BaseCollection(APIWrapper):
     # Index Management #
     ####################
 
-    def list_indexes(self):
+    def indexes(self):
         """Return the collection indexes.
 
         :returns: the collection indexes

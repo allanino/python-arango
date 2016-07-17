@@ -663,7 +663,7 @@ def test_list_indexes():
         'fields': ['_key'],
         'unique': True
     }
-    indexes = ecol.list_indexes()
+    indexes = ecol.indexes()
     assert isinstance(indexes, dict)
     assert expected_index in indexes.values()
 
@@ -677,7 +677,7 @@ def test_add_hash_index():
         'fields': ['attr1', 'attr2'],
         'unique': True
     }
-    assert expected_index in ecol.list_indexes().values()
+    assert expected_index in ecol.indexes().values()
 
 
 def test_add_skiplist_index():
@@ -688,7 +688,7 @@ def test_add_skiplist_index():
         'fields': ['attr1', 'attr2'],
         'unique': True
     }
-    assert expected_index in ecol.list_indexes().values()
+    assert expected_index in ecol.indexes().values()
 
 
 def test_add_geo_index():
@@ -706,7 +706,7 @@ def test_add_geo_index():
         'ignore_none': True,
         'constraint': False
     }
-    assert expected_index in ecol.list_indexes().values()
+    assert expected_index in ecol.indexes().values()
 
     # With two attributes
     ecol.add_geo_index(
@@ -721,7 +721,7 @@ def test_add_geo_index():
         'ignore_none': True,
         'constraint': False
     }
-    assert expected_index in ecol.list_indexes().values()
+    assert expected_index in ecol.indexes().values()
 
     # With more than two attributes (should fail)
     with pytest.raises(IndexCreateError):
@@ -744,18 +744,18 @@ def test_add_fulltext_index():
         'min_length': 10,
         'unique': False,
     }
-    assert expected_index in ecol.list_indexes().values()
+    assert expected_index in ecol.indexes().values()
 
 
 def test_delete_index():
-    old_indexes = set(ecol.list_indexes())
+    old_indexes = set(ecol.indexes())
     ecol.add_hash_index(['attr1', 'attr2'], unique=True)
     ecol.add_skiplist_index(['attr1', 'attr2'], unique=True)
     ecol.add_fulltext_index(fields=['attr1'], minimum_length=10)
 
-    new_indexes = set(ecol.list_indexes())
+    new_indexes = set(ecol.indexes())
     assert new_indexes.issuperset(old_indexes)
 
     for index_id in new_indexes - old_indexes:
         ecol.delete_index(index_id)
-    assert set(ecol.list_indexes()) == old_indexes
+    assert set(ecol.indexes()) == old_indexes
