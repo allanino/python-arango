@@ -22,14 +22,30 @@ ecol = db.create_collection(ecol_name, edge=True)
 ecol.add_geo_index(['coordinates'])
 
 # Set up test collection and edges
-col = generate_col_name(db)
-db.create_collection(col).insert_many([
+col_name = generate_col_name(db)
+db.create_collection(col_name).insert_many([
     {'_key': '1'}, {'_key': '2'}, {'_key': '3'}, {'_key': '4'}
 ])
-edge1 = {'_key': '1', '_from': '{}/1'.format(col), '_to': '{}/2'.format(col)}
-edge2 = {'_key': '2', '_from': '{}/2'.format(col), '_to': '{}/3'.format(col)}
-edge3 = {'_key': '3', '_from': '{}/3'.format(col), '_to': '{}/4'.format(col)}
-edge4 = {'_key': '4', '_from': '{}/4'.format(col), '_to': '{}/1'.format(col)}
+edge1 = {
+    '_key': '1',
+    '_from': '{}/1'.format(col_name),
+    '_to': '{}/2'.format(col_name)
+}
+edge2 = {
+    '_key': '2',
+    '_from': '{}/2'.format(col_name),
+    '_to': '{}/3'.format(col_name)
+}
+edge3 = {
+    '_key': '3',
+    '_from': '{}/3'.format(col_name),
+    '_to': '{}/4'.format(col_name)
+}
+edge4 = {
+    '_key': '4',
+    '_from': '{}/4'.format(col_name),
+    '_to': '{}/1'.format(col_name)
+}
 
 
 def teardown_module(*_):
@@ -288,19 +304,19 @@ def test_update_one():
     assert 'value' not in ecol['1']
 
     del edge['_rev']
-    edge['_to'] = '{}/3'.format(col)
+    edge['_to'] = '{}/3'.format(col_name)
     edge = ecol.update_one(edge)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert edge['_rev'].isdigit()
-    assert ecol['1']['_to'] == '{}/3'.format(col)
+    assert ecol['1']['_to'] == '{}/3'.format(col_name)
 
-    edge['_from'] = '{}/2'.format(col)
+    edge['_from'] = '{}/2'.format(col_name)
     edge = ecol.update_one(edge)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
     assert edge['_rev'].isdigit()
-    assert ecol['1']['_from'] == '{}/2'.format(col)
+    assert ecol['1']['_from'] == '{}/2'.format(col_name)
 
 
 def test_replace_one():
@@ -308,29 +324,29 @@ def test_replace_one():
     ecol.insert_one(edge)
 
     edge['value'] = 200
-    edge = ecol.replace_one(edge)
-    assert edge['_id'] == '{}/1'.format(ecol.name)
-    assert edge['_key'] == '1'
-    assert edge['_rev'].isdigit()
+    result = ecol.replace_one(edge)
+    assert result['_id'] == '{}/1'.format(ecol.name)
+    assert result['_key'] == '1'
+    assert result['_rev'].isdigit()
     assert ecol['1']['_from'] == edge['_from']
     assert ecol['1']['_to'] == edge['_to']
-    assert ecol['1']['value'] == edge['value']
+    assert ecol['1']['value'] == 200
 
     edge['value'] = 300
-    edge = ecol.replace_one(edge, sync=True)
-    assert edge['_id'] == '{}/1'.format(ecol.name)
-    assert edge['_key'] == '1'
-    assert edge['_rev'].isdigit()
+    result = ecol.replace_one(edge, sync=True)
+    assert result['_id'] == '{}/1'.format(ecol.name)
+    assert result['_key'] == '1'
+    assert result['_rev'].isdigit()
     assert ecol['1']['_from'] == edge['_from']
     assert ecol['1']['_to'] == edge['_to']
     assert ecol['1']['value'] == 300
 
     edge['value'] = 400
-    del edge['_rev']
-    edge = ecol.replace_one(edge)
-    assert edge['_id'] == '{}/1'.format(ecol.name)
-    assert edge['_key'] == '1'
-    assert edge['_rev'].isdigit()
+    edge['_rev'] = result['_rev']
+    result = ecol.replace_one(edge)
+    assert result['_id'] == '{}/1'.format(ecol.name)
+    assert result['_key'] == '1'
+    assert result['_rev'].isdigit()
     assert ecol['1']['_from'] == edge['_from']
     assert ecol['1']['_to'] == edge['_to']
     assert ecol['1']['value'] == 400
@@ -341,10 +357,11 @@ def test_replace_one():
         ecol.replace_one(edge)
     assert ecol['1']['value'] == 400
 
+    edge['_key'] = '2'
     edge['value'] = 600
     del edge['_rev']
     with pytest.raises(DocumentReplaceError):
-        ecol.replace_one('2', edge)
+        ecol.replace_one(edge)
     assert ecol['1']['value'] == 400
 
 
@@ -366,7 +383,7 @@ def test_delete_one():
     assert len(ecol) == 1
 
     edge = deepcopy(edge3)
-    edge['_rev'] = str(int(edge['_rev']) + 1)
+    edge['_rev'] = str(int(ecol['3']['_rev']) + 1)
     with pytest.raises(DocumentRevisionError):
         ecol.delete_one(edge)
     assert '3' in ecol
@@ -408,7 +425,7 @@ def test_delete_by_keys():
     assert len(ecol) == 0
 
 
-def test_all():
+def test_fetch_all():
     assert len(list(ecol.fetch_all())) == 0
     inserted = [edge1, edge2, edge3, edge4]
     ecol.insert_many(inserted)
@@ -434,7 +451,7 @@ def test_all():
     assert len(fetched) == 2
 
 
-def test_random():
+def test_fetch_random():
     assert len(list(ecol.fetch_all())) == 0
     inserted = [edge1, edge2, edge3, edge4]
     ecol.insert_many(inserted)
@@ -447,10 +464,19 @@ def test_random():
         } in inserted
 
 
-def test_find():
+def test_fetch():
     assert list(ecol.fetch({'value': 100})) == []
-    e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
-    e1['value'], e2['value'], e3['value'], e4['value'] = 100, 100, 200, 300
+
+    e1 = deepcopy(edge1)
+    e2 = deepcopy(edge2)
+    e3 = deepcopy(edge3)
+    e4 = deepcopy(edge4)
+
+    e1['value'] = 100
+    e2['value'] = 100
+    e3['value'] = 200
+    e4['value'] = 300
+
     inserted = [e1, e2, e3, e4]
     ecol.insert_many(inserted)
 
@@ -492,10 +518,19 @@ def test_find():
     assert found[0]['_key'] == '3'
 
 
-def test_find_and_update():
+def test_update():
     assert ecol.update({'value': 100}, {'bar': 100}) == 0
-    e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
-    e1['value'], e2['value'], e3['value'], e4['value'] = 100, 100, 200, 300
+
+    e1 = deepcopy(edge1)
+    e2 = deepcopy(edge2)
+    e3 = deepcopy(edge3)
+    e4 = deepcopy(edge4)
+
+    e1['value'] = 100
+    e2['value'] = 100
+    e3['value'] = 200
+    e4['value'] = 300
+
     inserted = [e1, e2, e3, e4]
     ecol.insert_many(inserted)
 
@@ -525,10 +560,19 @@ def test_find_and_update():
     assert 'new_value' in ecol['3']
 
 
-def test_find_and_replace():
+def test_replace():
     assert ecol.replace({'value': 100}, {'bar': 100}) == 0
-    e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
-    e1['value'], e2['value'], e3['value'], e4['value'] = 100, 100, 200, 300
+
+    e1 = deepcopy(edge1)
+    e2 = deepcopy(edge2)
+    e3 = deepcopy(edge3)
+    e4 = deepcopy(edge4)
+
+    e1['value'] = 100
+    e2['value'] = 100
+    e3['value'] = 200
+    e4['value'] = 300
+
     inserted = [e1, e2, e3, e4]
     ecol.insert_many(inserted)
 
@@ -558,10 +602,19 @@ def test_find_and_replace():
     assert 'new_value' not in ecol['4']
 
 
-def test_find_and_delete():
+def test_delete():
     assert ecol.delete({'value': 100}) == 0
-    e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
-    e1['value'], e2['value'], e3['value'], e4['value'] = 100, 100, 200, 300
+
+    e1 = deepcopy(edge1)
+    e2 = deepcopy(edge2)
+    e3 = deepcopy(edge3)
+    e4 = deepcopy(edge4)
+
+    e1['value'] = 100
+    e2['value'] = 100
+    e3['value'] = 200
+    e4['value'] = 300
+
     inserted = [e1, e2, e3, e4]
     ecol.insert_many(inserted)
 
@@ -582,12 +635,17 @@ def test_find_and_delete():
     assert count == 1
 
 
-def test_find_near():
-    e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
+def test_fetch_near():
+    e1 = deepcopy(edge1)
+    e2 = deepcopy(edge2)
+    e3 = deepcopy(edge3)
+    e4 = deepcopy(edge4)
+
     e1['coordinates'] = [1, 1]
     e2['coordinates'] = [2, 2]
     e3['coordinates'] = [3, 3]
     e4['coordinates'] = [4, 4]
+
     inserted = [e1, e4, e2, e3]
     ecol.insert_many(inserted)
 
@@ -598,12 +656,22 @@ def test_find_near():
     assert clean_keys(list(result)) == [e4, e3, e2, e1]
 
 
-def test_find_in_range():
+def test_fetch_in_range():
     ecol.add_skiplist_index(['value'])
-    e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
-    e1['value'], e2['value'], e3['value'], e4['value'] = 1, 2, 3, 4
+
+    e1 = deepcopy(edge1)
+    e2 = deepcopy(edge2)
+    e3 = deepcopy(edge3)
+    e4 = deepcopy(edge4)
+
+    e1['value'] = 1
+    e2['value'] = 2
+    e3['value'] = 3
+    e4['value'] = 4
+
     inserted = [e1, e2, e3, e4]
     ecol.insert_many(inserted)
+
     result = ecol.fetch_in_range(
         field='value',
         lower=2,
@@ -616,12 +684,17 @@ def test_find_in_range():
 
 
 # TODO the WITHIN geo function does not seem to work properly
-def test_find_in_radius():
-    e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
+def test_fetch_in_radius():
+    e1 = deepcopy(edge1)
+    e2 = deepcopy(edge2)
+    e3 = deepcopy(edge3)
+    e4 = deepcopy(edge4)
+
     e1['coordinates'] = [1, 1]
     e2['coordinates'] = [1, 4]
     e3['coordinates'] = [4, 1]
     e4['coordinates'] = [4, 4]
+
     inserted = [e1, e2, e3, e4]
     ecol.insert_many(inserted)
     result = list(ecol.fetch_in_radius(3, 3, 10, 'distance'))
@@ -629,8 +702,12 @@ def test_find_in_radius():
         assert 'distance' in doc
 
 
-def test_find_in_square():
-    e1, e2, e3, e4 = edge1.copy(), edge2.copy(), edge3.copy(), edge4.copy()
+def test_fetch_in_square():
+    e1 = deepcopy(edge1)
+    e2 = deepcopy(edge2)
+    e3 = deepcopy(edge3)
+    e4 = deepcopy(edge4)
+
     e1['coordinates'] = [1, 1]
     e2['coordinates'] = [1, 5]
     e3['coordinates'] = [5, 1]
@@ -665,9 +742,13 @@ def test_find_in_square():
     assert clean_keys(list(result)) == [e1]
 
 
-def test_find_text():
+def test_fetch_by_text():
     ecol.add_fulltext_index(['text'])
-    e1, e2, e3 = edge1.copy(), edge2.copy(), edge3.copy()
+
+    e1 = deepcopy(edge1)
+    e2 = deepcopy(edge2)
+    e3 = deepcopy(edge3)
+
     e1['text'] = 'foo'
     e2['text'] = 'bar'
     e3['text'] = 'baz'
@@ -679,10 +760,10 @@ def test_find_text():
     assert clean_keys(list(result)) == [e1, e2]
 
     # Bad parameter
-    with pytest.raises(DocumentFindTextError):
+    with pytest.raises(DocumentFetchError):
         ecol.fetch_by_text(key='text', query='+')
 
-    with pytest.raises(DocumentFindTextError):
+    with pytest.raises(DocumentFetchError):
         ecol.fetch_by_text(key='text', query='|')
 
 

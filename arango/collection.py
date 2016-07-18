@@ -6,13 +6,11 @@ from arango.cursor import Cursor
 from arango.constants import HTTP_OK
 from arango.exceptions import *
 from arango.request import Request
-from arango.api import APIWrapper
+from arango.wrapper import APIWrapper
 
 
 class BaseCollection(APIWrapper):
-    """Base ArangoDB collection object.
-
-    All collection classes inherit from this class.
+    """Base ArangoDB collection.
 
     :param connection: ArangoDB connection object
     :type connection: arango.connection.Connection
@@ -39,7 +37,7 @@ class BaseCollection(APIWrapper):
         self._name = name
 
     def __iter__(self):
-        """Fetch all documents in the collection.
+        """Iterate through all documents in the collection.
 
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
@@ -54,7 +52,7 @@ class BaseCollection(APIWrapper):
         return Cursor(self._conn, res.body)
 
     def __len__(self):
-        """Return the total number of documents in the collection.
+        """Return the number of documents in the collection.
 
         :returns: the number of documents
         :rtype: int
@@ -68,7 +66,7 @@ class BaseCollection(APIWrapper):
         return res.body['count']
 
     def __getitem__(self, key):
-        """Return a document from the collection.
+        """Return a document by key from the collection.
 
         :param key: the document key
         :type key: str
@@ -91,7 +89,7 @@ class BaseCollection(APIWrapper):
 
         :param key: the document key
         :type key: str
-        :returns: True if the document exists, else False
+        :returns: whether the document exists
         :rtype: bool
         :raises: CollectionContainsError
         """
@@ -134,7 +132,7 @@ class BaseCollection(APIWrapper):
 
         :param new_name: the new name for the collection
         :type new_name: str
-        :returns: the collection summary
+        :returns: the collection details
         :rtype: dict
         :raises: CollectionRenameError
         """
@@ -394,7 +392,7 @@ class BaseCollection(APIWrapper):
         return request, handler
 
     def count(self):
-        """Return the total number of documents in the collection.
+        """Return the number of documents in the collection.
 
         :returns: the number of documents
         :rtype: int
@@ -787,7 +785,7 @@ class BaseCollection(APIWrapper):
 
     def fetch_in_box(self, latitude1, longitude1, latitude2, longitude2,
                      skip=None, limit=None, geo_field=None):
-        """Return all documents in a square area.
+        """Return all documents in an rectangular area.
 
         A geo index must be defined in the collection for this method to be
         used. If there are more than one geo index, the ``geo`` argument can
@@ -1067,7 +1065,7 @@ class Collection(BaseCollection):
         return '<ArangoDB collection "{}">'.format(self._name)
 
     def fetch_by_key(self, key, rev=None):
-        """Fetch a document from the collection.
+        """Fetch a document by key from the collection.
 
         If ``rev`` is given, its value is compared against the revision of the
         target document. DocumentRevisionError is raised if the revisions do
@@ -1170,7 +1168,7 @@ class Collection(BaseCollection):
         return request, handler
 
     def update(self, filters, body, limit=None, keep_none=True, sync=None):
-        """Update matching documents in the collection.
+        """Update matching document(s) in the collection.
 
         If ``keep_none`` is set to True, the fields whose value is None are
         retained in the document. Otherwise, the field is removed from the
@@ -1215,7 +1213,7 @@ class Collection(BaseCollection):
         return request, handler
 
     def update_one(self, document, merge=True, keep_none=True, sync=None):
-        """Update a document in the collection.
+        """Update a document (by key) in the collection.
 
         The "_key" field must be present in ``document``.
 
@@ -1272,7 +1270,7 @@ class Collection(BaseCollection):
         return request, handler
 
     def replace(self, filters, body, limit=None, sync=None):
-        """Replace matching documents in the collection.
+        """Replace matching document(s) in the collection.
 
         :param filters: the document filters
         :type filters: dict
@@ -1310,10 +1308,10 @@ class Collection(BaseCollection):
         return request, handler
 
     def replace_one(self, document, sync=None):
-        """Replace the specified document in the collection.
+        """Replace a document (by key) in the collection.
 
         The "_key" field must be present in ``document``. For edge collections,
-        The "_from" and "_to" fields must also be present in ``document``.
+        The "_from" and "_to" fields must also be present.
 
         If the "_rev" field is present in ``document``, its value is compared
         against the revision of the target document. DocumentRevisionError is
@@ -1357,9 +1355,9 @@ class Collection(BaseCollection):
         return request, handler
 
     def delete(self, filters, limit=None, sync=None):
-        """Delete matching documents from the collection.
+        """Delete matching document(s) from the collection.
 
-        :param filters: the filters
+        :param filters: the document filters
         :type filters: dict
         :param limit: the the max number of documents to delete
         :type limit: int
@@ -1389,7 +1387,9 @@ class Collection(BaseCollection):
         return request, handler
 
     def delete_one(self, document, sync=None, ignore_missing=True):
-        """Delete a document from the collection.
+        """Delete a document (by key) from the collection.
+
+        The "_key" field must be present in ``document``.
 
         :param document: the document to delete
         :param sync: wait for the operation to sync to disk
@@ -1433,7 +1433,9 @@ class Collection(BaseCollection):
         return request, handler
 
     def delete_many(self, documents, sync=None):
-        """Delete multiple documents from the collection
+        """Delete multiple documents from the collection.
+
+        The "_key" field must be present in each document in ``documents``.
 
         :param documents: list of documents to delete
         :type documents: list
@@ -1511,15 +1513,6 @@ class VertexCollection(BaseCollection):
         )
 
     @property
-    def name(self):
-        """Return the name of the vertex collection.
-
-        :returns: the name of the vertex collection
-        :rtype: str
-        """
-        return self._name
-
-    @property
     def graph(self):
         """Return the name of the graph.
 
@@ -1528,19 +1521,19 @@ class VertexCollection(BaseCollection):
         """
         return self._graph
 
-    def insert_one(self, data, sync=False):
-        """Insert a vertex into the specified vertex collection of the graph.
+    def insert_one(self, document, sync=False):
+        """Insert a vertex document in the the collection.
 
-        If ``data`` contains the ``_key`` field, its value will be used as the
-        key of the new vertex. The must be unique in the vertex collection.
+        If the "_key" field is present in ``document``, its value is used as
+        the key of the new document. The key must be unique in the collection.
 
-        :param data: the body of the new vertex
-        :type data: dict
+        :param document: the document body
+        :type document: dict
         :param sync: wait for the operation to sync to disk
         :type sync: bool
-        :returns: the ID, revision and key of the inserted vertex
+        :returns: the ID, revision and key of the document
         :rtype: dict
-        :raises: VertexInsertError
+        :raises: DocumentInsertError
         """
         params = {}
         if sync is not None:
@@ -1550,13 +1543,13 @@ class VertexCollection(BaseCollection):
             endpoint='/_api/gharial/{}/vertex/{}'.format(
                 self._graph, self._name
             ),
-            data=data,
+            data=document,
             params=params
         )
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise VertexInsertError(res)
+                raise DocumentInsertError(res)
             return res.body['vertex']
 
         return request, handler

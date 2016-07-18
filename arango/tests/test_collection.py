@@ -328,6 +328,34 @@ def test_replace_one():
     assert col['1']['value'] == 400
 
 
+
+def test_delete():
+    assert col.delete({'value': 100}) == 0
+    col.insert_many([
+        {'_key': '1', 'value': 100},
+        {'_key': '2', 'value': 100},
+        {'_key': '3', 'value': 100},
+        {'_key': '4', 'value': 200},
+        {'_key': '5', 'value': 300},
+    ])
+
+    assert '4' in col
+    assert col.delete({'value': 200}) == 1
+    assert '4' not in col
+
+    assert '5' in col
+    assert col.delete({'value': 300}, sync=True) == 1
+    assert '5' not in col
+
+    assert col.delete({'value': 100}, limit=2) == 2
+    count = 0
+    for key in ['1', '2', '3']:
+        if key in col:
+            assert col[key]['value'] == 100
+            count += 1
+    assert count == 1
+
+
 def test_delete_one():
     doc1 = {'_key': '1', 'value': 100}
     doc2 = {'_key': '2', 'value': 200}
@@ -524,33 +552,6 @@ def test_replace():
 
     assert col['5']['value'] == 300
     assert 'bar' not in col['5']
-
-
-def test_delete():
-    assert col.delete({'value': 100}) == 0
-    col.insert_many([
-        {'_key': '1', 'value': 100},
-        {'_key': '2', 'value': 100},
-        {'_key': '3', 'value': 100},
-        {'_key': '4', 'value': 200},
-        {'_key': '5', 'value': 300},
-    ])
-
-    assert '4' in col
-    assert col.delete({'value': 200}) == 1
-    assert '4' not in col
-
-    assert '5' in col
-    assert col.delete({'value': 300}, sync=True) == 1
-    assert '5' not in col
-
-    assert col.delete({'value': 100}, limit=2) == 2
-    count = 0
-    for key in ['1', '2', '3']:
-        if key in col:
-            assert col[key]['value'] == 100
-            count += 1
-    assert count == 1
 
 
 def test_fetch_near():

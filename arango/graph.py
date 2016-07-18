@@ -4,7 +4,7 @@ from arango.collection import VertexCollection, EdgeCollection
 from arango.constants import HTTP_OK
 from arango.exceptions import *
 from arango.request import Request
-from arango.api import APIWrapper
+from arango.wrapper import APIWrapper
 
 
 class Graph(APIWrapper):
