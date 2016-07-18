@@ -1,5 +1,7 @@
 from __future__ import absolute_import, unicode_literals
 
+from copy import deepcopy
+
 import pytest
 from six import string_types
 
@@ -40,7 +42,7 @@ def setup_function(*_):
 
 def test_properties():
     assert ecol.name == ecol_name
-    assert repr(ecol) == ("<ArangoDB collection '{}'>".format(ecol_name))
+    assert repr(ecol) == '<ArangoDB collection "{}">'.format(ecol_name)
 
     properties = ecol.properties()
     assert 'id' in properties
@@ -70,7 +72,9 @@ def test_set_properties():
     result = ecol.set_properties(
         sync=new_sync, journal_size=new_journal_size
     )
-    assert isinstance(result, bool)
+    assert result['sync'] == new_sync
+    assert result['journal_size'] == new_journal_size
+
     new_properties = ecol.properties()
     assert new_properties['sync'] == new_sync
     assert new_properties['journal_size'] == new_journal_size
@@ -81,15 +85,15 @@ def test_rename():
     new_name = generate_col_name(db)
 
     result = ecol.rename(new_name)
-    assert result is True
+    assert result['name'] == new_name
     assert ecol.name == new_name
-    assert repr(ecol) == "<ArangoDB collection '{}'>".format(new_name)
+    assert repr(ecol) == '<ArangoDB collection "{}">'.format(new_name)
 
     # Try again (the operation should be idempotent)
     result = ecol.rename(new_name)
-    assert result is True
+    assert result['name'] == new_name
     assert ecol.name == new_name
-    assert repr(ecol) == "<ArangoDB collection '{}'>".format(new_name)
+    assert repr(ecol) == '<ArangoDB collection "{}">'.format(new_name)
 
 
 def test_statistics():
@@ -108,12 +112,12 @@ def test_revision():
 
 def test_load():
     status = ecol.load()
-    assert status in ('loaded', 'loading')
+    assert status in {'loaded', 'loading'}
 
 
 def test_unload():
     status = ecol.unload()
-    assert status in ('unloaded', 'unloading')
+    assert status in {'unloaded', 'unloading'}
 
 
 def test_rotate():
@@ -141,11 +145,14 @@ def test_truncate():
     assert len(ecol) > 1
 
     result = ecol.truncate()
-    assert isinstance(result, bool)
+    assert 'id' in result
+    assert 'name' in result
+    assert 'status' in result
+    assert 'is_system' in result
     assert len(ecol) == 0
 
 
-def test_insert():
+def test_insert_one():
     assert '1' not in ecol
     edge = ecol.insert_one(edge1)
     assert edge['_key'] == '1'
@@ -200,7 +207,7 @@ def test_insert_many():
     assert 'details' not in result
 
 
-def test_get():
+def test_fetch_by_key():
     ecol.insert_one(edge1)
     edge = ecol.fetch_by_key('1')
     assert edge['_key'] == '1'
@@ -216,7 +223,7 @@ def test_get():
         ecol.fetch_by_key('1', rev=new_rev)
 
 
-def test_get_many():
+def test_fetch_by_keys():
     assert ecol.fetch_by_keys(['1', '2', '3', '4', '5']) == []
     expected = [edge1, edge2, edge3, edge4]
     ecol.insert_many(expected)
@@ -231,123 +238,147 @@ def test_get_many():
     ]
 
 
-def test_update():
-    ecol.insert_one(edge1)
-    edge = ecol.update_one('1', {'value': 200})
+def test_update_one():
+    edge = deepcopy(edge1)
+    ecol.insert_one(edge)
+
+    edge['value'] = 200
+    edge = ecol.update_one(edge)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
+    assert edge['_rev'].isdigit()
     assert ecol['1']['value'] == 200
 
-    edge = ecol.update_one('1', {'value': None}, keep_none=True)
+    edge['value'] = None
+    edge = ecol.update_one(edge, keep_none=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
+    assert edge['_rev'].isdigit()
     assert ecol['1']['value'] is None
 
-    edge = ecol.update_one('1', {'value': {'bar': 1}}, sync=True)
+    edge['value'] = {'bar': 1}
+    edge = ecol.update_one(edge, sync=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
+    assert edge['_rev'].isdigit()
     assert ecol['1']['value'] == {'bar': 1}
 
-    edge = ecol.update_one('1', {'value': {'baz': 2}}, merge=True)
+    edge['value'] = {'baz': 2}
+    edge = ecol.update_one(edge, merge=True)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
+    assert edge['_rev'].isdigit()
     assert ecol['1']['value'] == {'bar': 1, 'baz': 2}
 
-    edge = ecol.update_one('1', {'value': None}, keep_none=False)
+    edge['value'] = None
+    edge = ecol.update_one(edge, keep_none=False)
     assert edge['_id'] == '{}/1'.format(ecol.name)
     assert edge['_key'] == '1'
+    assert edge['_rev'].isdigit()
     assert 'value' not in ecol['1']
 
-    old_rev = edge['_rev']
-    new_rev = str(int(old_rev) + 1)
-
+    edge['value'] = 300
+    edge['_rev'] = str(int(edge['_rev']) + 1)
     with pytest.raises(DocumentRevisionError):
-        ecol.update_one('1', {'value': 300, '_rev': new_rev})
+        ecol.update_one(edge)
     assert 'value' not in ecol['1']
 
     with pytest.raises(DocumentUpdateError):
-        ecol.update_one('2', {'value': 300})
+        ecol.update_one({'_key': '2', 'value': 300})
     assert 'value' not in ecol['1']
 
-    ecol.update_one('1', {'_to': '{}/3'.format(col)})
+    del edge['_rev']
+    edge['_to'] = '{}/3'.format(col)
+    edge = ecol.update_one(edge)
+    assert edge['_id'] == '{}/1'.format(ecol.name)
+    assert edge['_key'] == '1'
+    assert edge['_rev'].isdigit()
     assert ecol['1']['_to'] == '{}/3'.format(col)
 
-    ecol.update_one('1', {'_from': '{}/2'.format(col)})
+    edge['_from'] = '{}/2'.format(col)
+    edge = ecol.update_one(edge)
+    assert edge['_id'] == '{}/1'.format(ecol.name)
+    assert edge['_key'] == '1'
+    assert edge['_rev'].isdigit()
     assert ecol['1']['_from'] == '{}/2'.format(col)
 
 
-def test_replace():
-    ecol.insert_one(edge1)
-    new_data = {
-        '_from': edge1['_from'],
-        '_to': edge1['_to'],
-        'value': 200
-    }
-    new_edge = ecol.replace_one('1', new_data)
-    assert new_edge['_id'] == '{}/1'.format(ecol.name)
-    assert new_edge['_key'] == '1'
-    assert ecol['1']['_from'] == edge1['_from']
-    assert ecol['1']['_to'] == edge1['_to']
-    assert ecol['1']['value'] == 200
+def test_replace_one():
+    edge = deepcopy(edge1)
+    ecol.insert_one(edge)
 
-    new_data['value'] = 300
-    new_edge = ecol.replace_one('1', new_data, sync=True)
-    assert new_edge['_id'] == '{}/1'.format(ecol.name)
-    assert new_edge['_key'] == '1'
+    edge['value'] = 200
+    edge = ecol.replace_one(edge)
+    assert edge['_id'] == '{}/1'.format(ecol.name)
+    assert edge['_key'] == '1'
+    assert edge['_rev'].isdigit()
+    assert ecol['1']['_from'] == edge['_from']
+    assert ecol['1']['_to'] == edge['_to']
+    assert ecol['1']['value'] == edge['value']
+
+    edge['value'] = 300
+    edge = ecol.replace_one(edge, sync=True)
+    assert edge['_id'] == '{}/1'.format(ecol.name)
+    assert edge['_key'] == '1'
+    assert edge['_rev'].isdigit()
+    assert ecol['1']['_from'] == edge['_from']
+    assert ecol['1']['_to'] == edge['_to']
     assert ecol['1']['value'] == 300
 
-    new_data['value'] = 400
-    new_edge = ecol.replace_one('1', new_data, rev=new_edge['_rev'])
-    assert new_edge['_id'] == '{}/1'.format(ecol.name)
-    assert new_edge['_key'] == '1'
+    edge['value'] = 400
+    del edge['_rev']
+    edge = ecol.replace_one(edge)
+    assert edge['_id'] == '{}/1'.format(ecol.name)
+    assert edge['_key'] == '1'
+    assert edge['_rev'].isdigit()
+    assert ecol['1']['_from'] == edge['_from']
+    assert ecol['1']['_to'] == edge['_to']
     assert ecol['1']['value'] == 400
 
-    old_rev = new_edge['_rev']
-    new_rev = str(int(old_rev) + 1)
-
-    new_data['value'] = 500
-    new_data['_rev'] = new_rev
+    edge['value'] = 500
+    edge['_rev'] = str(int(edge['_rev']) + 1)
     with pytest.raises(DocumentRevisionError):
-        ecol.replace_one('1', new_data)
+        ecol.replace_one(edge)
     assert ecol['1']['value'] == 400
 
-    new_data['value'] = 600
-    del new_data['_rev']
+    edge['value'] = 600
+    del edge['_rev']
     with pytest.raises(DocumentReplaceError):
-        ecol.replace_one('2', new_data)
+        ecol.replace_one('2', edge)
     assert ecol['1']['value'] == 400
 
 
-def test_delete():
+def test_delete_one():
     ecol.insert_many([edge1, edge2, edge3])
 
-    edge = ecol.delete_one('1')
-    assert edge['id'] == '{}/1'.format(ecol.name)
-    assert edge['key'] == '1'
+    result = ecol.delete_one(edge1)
+    assert result['_id'] == '{}/1'.format(ecol.name)
+    assert result['_key'] == '1'
+    assert result['_rev'].isdigit()
     assert '1' not in ecol
     assert len(ecol) == 2
 
-    edge = ecol.delete_one('2', sync=True)
-    assert edge['id'] == '{}/2'.format(ecol.name)
-    assert edge['key'] == '2'
+    result = ecol.delete_one(edge2, sync=True)
+    assert result['_id'] == '{}/2'.format(ecol.name)
+    assert result['_key'] == '2'
+    assert result['_rev'].isdigit()
     assert '2' not in ecol
     assert len(ecol) == 1
 
-    old_rev = ecol['3']['_rev']
-    new_rev = str(int(old_rev) + 1)
-
+    edge = deepcopy(edge3)
+    edge['_rev'] = str(int(edge['_rev']) + 1)
     with pytest.raises(DocumentRevisionError):
-        ecol.delete_one('3', rev=new_rev)
+        ecol.delete_one(edge)
     assert '3' in ecol
     assert len(ecol) == 1
 
-    assert ecol.delete_one('4') == False
+    assert ecol.delete_one(edge4, ignore_missing=True) is None
     with pytest.raises(DocumentDeleteError):
-        ecol.delete_one('4', ignore_missing=False)
+        ecol.delete_one(edge4, ignore_missing=False)
     assert len(ecol) == 1
 
 
-def test_delete_many():
+def test_delete_by_keys():
     result = ecol.delete_by_keys(['1', '2', '3'])
     assert result['removed'] == 0
     assert result['ignored'] == 3

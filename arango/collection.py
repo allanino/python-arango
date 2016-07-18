@@ -1064,7 +1064,7 @@ class Collection(BaseCollection):
         super(Collection, self).__init__(connection, name)
 
     def __repr__(self):
-        return "<ArangoDB collection '{}'>".format(self._name)
+        return '<ArangoDB collection "{}">'.format(self._name)
 
     def fetch_by_key(self, key, rev=None):
         """Fetch a document from the collection.
@@ -1506,7 +1506,7 @@ class VertexCollection(BaseCollection):
         self._graph = graph
 
     def __repr__(self):
-        return "<ArangoDB vertex collection '{}' in graph '{}'>".format(
+        return '<ArangoDB vertex collection "{}" in graph "{}">'.format(
             self._name, self._graph
         )
 
@@ -1748,7 +1748,7 @@ class EdgeCollection(BaseCollection):
         self._graph = graph
 
     def __repr__(self):
-        return '<ArangoDB edge collection "{}" in graph "{}"'.format(
+        return '<ArangoDB edge collection "{}" in graph "{}">'.format(
             self._name, self._graph
         )
 
