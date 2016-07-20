@@ -46,20 +46,20 @@ def test_create_vertex_collection():
     assert graph.create_vertex_collection('vcol1') == True
     assert graph.vertex_collections() == ['vcol1']
     assert graph.orphan_collections() == ['vcol1']
-    assert 'vcol1' in db.list_collections()
+    assert 'vcol1' in db.collections()
 
     # Test create duplicate vertex collection
     with pytest.raises(VertexCollectionCreateError):
         graph.create_vertex_collection('vcol1')
     assert graph.vertex_collections() == ['vcol1']
     assert graph.orphan_collections() == ['vcol1']
-    assert 'vcol1' in db.list_collections()
+    assert 'vcol1' in db.collections()
 
     assert graph.create_vertex_collection('vcol2') == True
     assert sorted(graph.vertex_collections()) == ['vcol1', 'vcol2']
     assert graph.orphan_collections() == ['vcol1', 'vcol2']
-    assert 'vcol1' in db.list_collections()
-    assert 'vcol2' in db.list_collections()
+    assert 'vcol1' in db.collections()
+    assert 'vcol2' in db.collections()
 
 
 @pytest.mark.order3
@@ -72,7 +72,7 @@ def test_delete_vertex_collection():
     assert sorted(graph.vertex_collections()) == ['vcol1', 'vcol2']
     assert graph.delete_vertex_collection('vcol1') == True
     assert graph.vertex_collections() == ['vcol2']
-    assert 'vcol1' in db.list_collections()
+    assert 'vcol1' in db.collections()
 
     # Test delete missing vertex collection
     with pytest.raises(VertexCollectionDeleteError):
@@ -80,8 +80,8 @@ def test_delete_vertex_collection():
 
     assert graph.delete_vertex_collection('vcol2', purge=True) == True
     assert graph.vertex_collections() == []
-    assert 'vcol1' in db.list_collections()
-    assert 'vcol2' not in db.list_collections()
+    assert 'vcol1' in db.collections()
+    assert 'vcol2' not in db.collections()
 
 
 @pytest.mark.order5
@@ -93,7 +93,7 @@ def test_create_edge_definition():
         'from_collections': [],
         'to_collections': []
     }]
-    assert 'ecol1' in db.list_collections()
+    assert 'ecol1' in db.collections()
 
     # Test create duplicate edge definition
     with pytest.raises(EdgeDefinitionCreateError):
@@ -107,7 +107,11 @@ def test_create_edge_definition():
     # Test create edge definition with existing vertex collection
     assert graph.create_vertex_collection('vcol1') == True
     assert graph.create_vertex_collection('vcol2') == True
-    assert graph.create_edge_collection('ecol2', ['vcol1'], ['vcol2']) == True
+    assert graph.create_edge_collection(
+        name='ecol2',
+        from_collections=['vcol1'],
+        to_collections=['vcol2']
+    ) == True
     assert graph.edge_collections() == [
         {
             'name': 'ecol1',
@@ -120,10 +124,14 @@ def test_create_edge_definition():
             'to_collections': ['vcol2']
         }
     ]
-    assert 'ecol2' in db.list_collections()
+    assert 'ecol2' in db.collections()
 
     # Test create edge definition with missing vertex collection
-    assert graph.create_edge_collection('ecol3', ['vcol3'], ['vcol3']) == True
+    assert graph.create_edge_collection(
+        name='ecol3',
+        from_collections=['vcol3'],
+        to_collections=['vcol3']
+    ) == True
     assert graph.edge_collections() == [
         {
             'name': 'ecol1',
@@ -143,8 +151,8 @@ def test_create_edge_definition():
     ]
     assert 'vcol3' in graph.vertex_collections()
     assert 'vcol3' not in graph.orphan_collections()
-    assert 'vcol3' in db.list_collections()
-    assert 'ecol3' in db.list_collections()
+    assert 'vcol3' in db.collections()
+    assert 'ecol3' in db.collections()
 
 
 @pytest.mark.order6
@@ -248,8 +256,8 @@ def test_delete_edge_definition():
     ]
     assert graph.orphan_collections() == ['vcol4']
     assert 'vcol4' in graph.vertex_collections()
-    assert 'vcol4' in db.list_collections()
-    assert 'ecol3' in db.list_collections()
+    assert 'vcol4' in db.collections()
+    assert 'ecol3' in db.collections()
 
     with pytest.raises(EdgeDefinitionDeleteError):
         graph.delete_edge_collection('ecol3')
@@ -263,9 +271,9 @@ def test_delete_edge_definition():
         }
     ]
     assert sorted(graph.orphan_collections()) == ['vcol2', 'vcol3', 'vcol4']
-    assert 'ecol1' not in db.list_collections()
-    assert 'ecol2' in db.list_collections()
-    assert 'ecol3' in db.list_collections()
+    assert 'ecol1' not in db.collections()
+    assert 'ecol2' in db.collections()
+    assert 'ecol3' in db.collections()
 
 
 @pytest.mark.order9
@@ -275,30 +283,32 @@ def test_insert_vertex():
     vertex2 = {'_key': '2', 'value': 2}
 
     assert '1' not in vcol
+    assert len(vcol) == 0
     assert vcol.insert_one(vertex1)
     assert '1' in vcol
     assert len(vcol) == 1
 
     # Test insert vertex into missing collection
-    with pytest.raises(VertexInsertError):
+    with pytest.raises(DocumentInsertError):
         assert vcol.insert_one('missing', vertex1)
 
     # Test insert duplicate vertex
-    with pytest.raises(VertexInsertError):
+    with pytest.raises(DocumentInsertError):
         assert vcol.insert_one(vertex1)
 
     assert '2' not in vcol
+    assert len(vcol) == 1
     assert vcol.insert_one(vertex2)
     assert '2' in vcol
     assert len(vcol) == 2
 
     # Test insert duplicate vertex second time
-    with pytest.raises(VertexInsertError):
+    with pytest.raises(DocumentInsertError):
         assert vcol.insert_one(vertex2)
 
 
 @pytest.mark.order10
-def test_get_vertex():
+def test_fetch_vertex():
     vcol = graph.vertex_collection('vcol1')
     vertex1 = {'_key': '1', 'value': 1}
     vertex2 = {'_key': '2', 'value': 2}
@@ -312,19 +322,21 @@ def test_get_vertex():
     assert clean_keys(result) == vertex1
 
     # Test get existing vertex with wrong revision
-    new_rev = str(int(old_rev) + 1)
-    with pytest.raises(VertexRevisionError):
-        vcol.fetch_by_key('1', new_rev)
+    with pytest.raises(DocumentRevisionError):
+        vcol.fetch_by_key('1', rev=str(int(old_rev) + 1))
 
+    # Test get existing vertex again
     assert clean_keys(vcol.fetch_by_key('2')) == vertex2
 
 
 @pytest.mark.order11
 def test_update_vertex():
     vcol = graph.vertex_collection('vcol1')
+
     assert 'foo' not in vcol.fetch_by_key('1')
-    assert vcol.update_one('1', {'foo': 100})
+    assert vcol.update_one({'_key': '1', 'foo': 100})
     assert vcol.fetch_by_key('1')['foo'] == 100
+    assert vcol['1']['foo'] == 100
 
     result = vcol.update_one('1', {'foo': 200, 'bar': 300})
     assert result['_id'] == 'vcol1/1'
@@ -344,7 +356,7 @@ def test_update_vertex():
     assert vcol.fetch_by_key('1')['bar'] == 500
 
     new_rev = str(int(old_rev) + 10)
-    with pytest.raises(VertexRevisionError):
+    with pytest.raises(DocumentRevisionError):
         vcol.update_one('1', {'bar': 600}, rev=new_rev)
     assert vcol.fetch_by_key('1')['bar'] == 500
 
@@ -430,16 +442,16 @@ def test_delete_vertex():
     old_rev = vcol.fetch_by_key('2')['_rev']
     new_rev = str(int(old_rev) + 10)
     with pytest.raises(VertexRevisionError):
-        vcol.clear('2', rev=new_rev)
+        vcol.delete('2', rev=new_rev)
     assert '2' in vcol
 
     # Test delete vertex from missing collection
     with pytest.raises(VertexDeleteError):
-        graph.vertex_collection('missing').clear('1', ignore_missing=False)
+        graph.vertex_collection('missing').delete('1', ignore_missing=False)
 
     # Test delete missing vertex
     with pytest.raises(VertexDeleteError):
-        vcol.clear('10', ignore_missing=False)
+        vcol.delete('10', ignore_missing=False)
 
 
 @pytest.mark.order14

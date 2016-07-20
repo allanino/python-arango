@@ -32,7 +32,7 @@ class Transaction(object):
     #     :param params: Parameters for the function in action
     #     :type params: list or dict | None
     #     :param sync: wait for the transaction to sync to disk
-    #     :type sync: bool
+    #     :type sync: bool | None
     #     :param lock_timeout: timeout for waiting on collection locks
     #     :type lock_timeout: int | None
     #     :returns: the results of the execution

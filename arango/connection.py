@@ -1,10 +1,13 @@
 from __future__ import absolute_import, unicode_literals
 
+import logging
 from json import dumps
 
 from six import string_types as string
 
 from arango.http_clients import DefaultHTTPClient
+
+logger = logging.getLogger('arango')
 
 
 class Connection(object):
@@ -22,8 +25,10 @@ class Connection(object):
     :type username: str
     :param password: ArangoDB password (default: '')
     :type password: str
-    :param client: the HTTP client
-    :type client: arango.clients.base.BaseHTTPClient | None
+    :param http_client: the HTTP client
+    :type http_client: arango.clients.base.BaseHTTPClient | None
+    :param enable_logging: log all API requests
+    :type enable_logging: bool
     """
 
     def __init__(self,
@@ -33,7 +38,8 @@ class Connection(object):
                  database='_system',
                  username='root',
                  password='',
-                 client=None):
+                 http_client=None,
+                 enable_logging=True):
 
         self._protocol = protocol.strip('/')
         self._host = host.strip('/')
@@ -47,8 +53,8 @@ class Connection(object):
         )
         self._username = username
         self._password = password
-        self._client = client or DefaultHTTPClient()
-        self._execute_type = 'normal'
+        self._client = http_client or DefaultHTTPClient()
+        self._logging = enable_logging
 
     def __repr__(self):
         return '<ArangoDB connection to "{}">'.format(self.url_prefix)
@@ -81,6 +87,10 @@ class Connection(object):
     def client(self):
         return self._client
 
+    @property
+    def logging_enabled(self):
+        return self._logging
+
     def handle_request(self, request, handler):
         return handler(getattr(self, request.method)(**request.kwargs))
 
@@ -96,12 +106,15 @@ class Connection(object):
         :returns: the ArangoDB http response
         :rtype: arango.response.Response
         """
-        return self._client.head(
+        res = self._client.head(
             url=self._url_prefix + endpoint,
             params=params,
             headers=headers,
             auth=(self._username, self._password)
         )
+        if self._logging:
+            logger.debug('HEAD {} {}'.format(endpoint, res.status_code))
+        return res
 
     def get(self, endpoint, params=None, headers=None, **_):
         """Execute a GET API method.
@@ -115,12 +128,15 @@ class Connection(object):
         :returns: the ArangoDB http response
         :rtype: arango.response.Response
         """
-        return self._client.get(
+        res = self._client.get(
             url=self._url_prefix + endpoint,
             params=params,
             headers=headers,
             auth=(self._username, self._password),
         )
+        if self._logging:
+            logger.debug('GET {} {}'.format(endpoint, res.status_code))
+        return res
 
     def put(self, endpoint, data=None, params=None, headers=None, **_):
         """Execute a PUT API method.
@@ -136,13 +152,16 @@ class Connection(object):
         :returns: the ArangoDB http response
         :rtype: arango.response.Response
         """
-        return self._client.put(
+        res = self._client.put(
             url=self._url_prefix + endpoint,
             data=data if isinstance(data, string) else dumps(data),
             params=params,
             headers=headers,
             auth=(self._username, self._password)
         )
+        if self._logging:
+            logger.debug('PUT {} {}'.format(endpoint, res.status_code))
+        return res
 
     def post(self, endpoint, data=None, params=None, headers=None, **_):
         """Execute a POST API method.
@@ -158,13 +177,16 @@ class Connection(object):
         :returns: the ArangoDB http response
         :rtype: arango.response.Response
         """
-        return self._client.post(
+        res = self._client.post(
             url=self._url_prefix + endpoint,
             data=data if isinstance(data, string) else dumps(data),
             params=params,
             headers=headers,
             auth=(self._username, self._password)
         )
+        if self._logging:
+            logger.debug('POST {} {}'.format(endpoint, res.status_code))
+        return res
 
     def patch(self, endpoint, data=None, params=None, headers=None, **_):
         """Execute a PATCH API method.
@@ -180,13 +202,16 @@ class Connection(object):
         :returns: the ArangoDB http response
         :rtype: arango.response.Response
         """
-        return self._client.patch(
+        res = self._client.patch(
             url=self._url_prefix + endpoint,
             data=data if isinstance(data, string) else dumps(data),
             params=params,
             headers=headers,
             auth=(self._username, self._password)
         )
+        if self._logging:
+            logger.debug('PATCH {} {}'.format(endpoint, res.status_code))
+        return res
 
     def delete(self, endpoint, params=None, headers=None, **_):
         """Execute a DELETE API method.
@@ -200,9 +225,12 @@ class Connection(object):
         :returns: the ArangoDB http response
         :rtype: arango.response.Response
         """
-        return self._client.delete(
+        res = self._client.delete(
             url=self._url_prefix + endpoint,
             params=params,
             headers=headers,
             auth=(self._username, self._password)
         )
+        if self._logging:
+            logger.debug('DELETE {} {}'.format(endpoint, res.status_code))
+        return res

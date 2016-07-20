@@ -139,20 +139,20 @@ def test_unload():
 def test_rotate():
     # No journal should exist yet
     with pytest.raises(CollectionRotateError):
-        ecol.rotate_journal()
+        ecol.rotate()
 
 
 def test_checksum():
-    assert ecol.checksum(revision=True, data=False) == 0
-    assert ecol.checksum(revision=True, data=True) == 0
-    assert ecol.checksum(revision=False, data=False) == 0
-    assert ecol.checksum(revision=False, data=True) == 0
+    assert ecol.checksum(include_rev=True, include_data=False) == 0
+    assert ecol.checksum(include_rev=True, include_data=True) == 0
+    assert ecol.checksum(include_rev=False, include_data=False) == 0
+    assert ecol.checksum(include_rev=False, include_data=True) == 0
 
     ecol.insert_one(edge1)
-    assert ecol.checksum(revision=True, data=False) > 0
-    assert ecol.checksum(revision=True, data=True) > 0
-    assert ecol.checksum(revision=False, data=False) > 0
-    assert ecol.checksum(revision=False, data=True) > 0
+    assert ecol.checksum(include_rev=True, include_data=False) > 0
+    assert ecol.checksum(include_rev=True, include_data=True) > 0
+    assert ecol.checksum(include_rev=False, include_data=False) > 0
+    assert ecol.checksum(include_rev=False, include_data=True) > 0
 
 
 def test_truncate():
@@ -223,35 +223,46 @@ def test_insert_many():
     assert 'details' not in result
 
 
-def test_fetch_by_key():
-    ecol.insert_one(edge1)
-    edge = ecol.fetch_by_key('1')
-    assert edge['_key'] == '1'
-    assert edge['_from'] == edge1['_from']
-    assert edge['_to'] == edge1['_to']
-    assert ecol.fetch_by_key('2') is None
+def test_update():
+    assert ecol.update({'value': 100}, {'bar': 100}) == 0
 
-    old_rev = edge['_rev']
-    new_rev = str(int(old_rev) + 1)
-    assert ecol.fetch_by_key('1', rev=old_rev) == edge
+    e1 = deepcopy(edge1)
+    e2 = deepcopy(edge2)
+    e3 = deepcopy(edge3)
+    e4 = deepcopy(edge4)
 
-    with pytest.raises(DocumentRevisionError):
-        ecol.fetch_by_key('1', rev=new_rev)
+    e1['value'] = 100
+    e2['value'] = 100
+    e3['value'] = 200
+    e4['value'] = 300
 
+    inserted = [e1, e2, e3, e4]
+    ecol.insert_many(inserted)
 
-def test_fetch_by_keys():
-    assert ecol.fetch_by_keys(['1', '2', '3', '4', '5']) == []
-    expected = [edge1, edge2, edge3, edge4]
-    ecol.insert_many(expected)
-    assert ecol.fetch_by_keys([]) == []
-    assert expected == [
-        {'_key': edge['_key'], '_from': edge['_from'], '_to': edge['_to']}
-        for edge in ecol.fetch_by_keys(['1', '2', '3', '4'])
-    ]
-    assert expected == [
-        {'_key': edge['_key'], '_from': edge['_from'], '_to': edge['_to']}
-        for edge in ecol.fetch_by_keys(['1', '2', '3', '4', '5', '6'])
-    ]
+    assert ecol.update({'value': 100}, {'new_value': 200}) == 2
+    for key in ['1', '2']:
+        assert ecol[key]['value'] == 100
+        assert ecol[key]['new_value'] == 200
+
+    assert ecol.update({'value': 200}, {'new_value': 100}) == 1
+    assert ecol['3']['value'] == 200
+    assert ecol['3']['new_value'] == 100
+
+    assert ecol.update(
+        {'value': 300},
+        {'value': None},
+        sync=True,
+        keep_none=True
+    ) == 1
+    assert ecol['4']['value'] is None
+    assert ecol.update(
+        {'value': 200},
+        {'value': None},
+        sync=True,
+        keep_none=False
+    ) == 1
+    assert 'value' not in ecol['3']
+    assert 'new_value' in ecol['3']
 
 
 def test_update_one():
@@ -319,6 +330,48 @@ def test_update_one():
     assert ecol['1']['_from'] == '{}/2'.format(col_name)
 
 
+def test_replace():
+    assert ecol.replace({'value': 100}, {'bar': 100}) == 0
+
+    e1 = deepcopy(edge1)
+    e2 = deepcopy(edge2)
+    e3 = deepcopy(edge3)
+    e4 = deepcopy(edge4)
+
+    e1['value'] = 100
+    e2['value'] = 100
+    e3['value'] = 200
+    e4['value'] = 300
+
+    inserted = [e1, e2, e3, e4]
+    ecol.insert_many(inserted)
+
+    assert ecol.replace(
+        {'value': 200},
+        {'_from': e3['_from'], '_to': e3['_to'], 'new_value': 100}
+    ) == 1
+    assert 'value' not in ecol['3']
+    assert ecol['3']['new_value'] == 100
+
+    assert ecol.replace(
+        {'value': 100},
+        {'_from': e1['_from'], '_to': e1['_to'], 'new_value': 400}
+    ) == 2
+    for key in ['1', '2']:
+        assert 'value' not in ecol[key]
+        assert ecol[key]['new_value'] == 400
+
+    assert ecol.replace(
+        {'value': 500},
+        {'_from': e2['_from'], '_to': e2['_to'], 'new_value': 500}
+    ) == 0
+    for key in ['1', '2', '3', '4']:
+        assert ecol[key].get('new_value', None) != 500
+
+    assert ecol['4']['value'] == 300
+    assert 'new_value' not in ecol['4']
+
+
 def test_replace_one():
     edge = deepcopy(edge1)
     ecol.insert_one(edge)
@@ -365,6 +418,39 @@ def test_replace_one():
     assert ecol['1']['value'] == 400
 
 
+def test_delete():
+    assert ecol.delete({'value': 100}) == 0
+
+    e1 = deepcopy(edge1)
+    e2 = deepcopy(edge2)
+    e3 = deepcopy(edge3)
+    e4 = deepcopy(edge4)
+
+    e1['value'] = 100
+    e2['value'] = 100
+    e3['value'] = 200
+    e4['value'] = 300
+
+    inserted = [e1, e2, e3, e4]
+    ecol.insert_many(inserted)
+
+    assert '3' in ecol
+    assert ecol.delete({'value': 200}) == 1
+    assert '3' not in ecol
+
+    assert '4' in ecol
+    assert ecol.delete({'value': 300}, sync=True) == 1
+    assert '4' not in ecol
+
+    assert ecol.delete({'value': 100}, limit=1) == 1
+    count = 0
+    for key in ['1', '2']:
+        if key in ecol:
+            assert ecol[key]['value'] == 100
+            count += 1
+    assert count == 1
+
+
 def test_delete_one():
     ecol.insert_many([edge1, edge2, edge3])
 
@@ -389,7 +475,7 @@ def test_delete_one():
     assert '3' in ecol
     assert len(ecol) == 1
 
-    assert ecol.delete_one(edge4, ignore_missing=True) is None
+    assert ecol.delete_one(edge4, ignore_missing=True) is False
     with pytest.raises(DocumentDeleteError):
         ecol.delete_one(edge4, ignore_missing=False)
     assert len(ecol) == 1
@@ -423,45 +509,6 @@ def test_delete_by_keys():
     assert result['removed'] == 2
     assert result['ignored'] == 1
     assert len(ecol) == 0
-
-
-def test_fetch_all():
-    assert len(list(ecol.fetch_all())) == 0
-    inserted = [edge1, edge2, edge3, edge4]
-    ecol.insert_many(inserted)
-    # for doc in inserted:
-    #     ecol.insert(doc)
-    fetched = list(ecol.fetch_all())
-    assert len(fetched) == len(inserted)
-    for edge in fetched:
-        assert {
-            '_key': edge['_key'],
-            '_from': edge['_from'],
-            '_to': edge['_to']
-        } in inserted
-
-    # TODO ordering seems strange
-    assert len(list(ecol.fetch_all(offset=4))) == 0
-    fetched = list(ecol.fetch_all(offset=2))
-    assert len(fetched) == 2
-
-    # TODO ordering seems strange
-    assert len(list(ecol.fetch_all(limit=0))) == 0
-    fetched = list(ecol.fetch_all(limit=2))
-    assert len(fetched) == 2
-
-
-def test_fetch_random():
-    assert len(list(ecol.fetch_all())) == 0
-    inserted = [edge1, edge2, edge3, edge4]
-    ecol.insert_many(inserted)
-    for attempt in range(10):
-        edge = ecol.fetch_random()
-        assert {
-            '_key': edge['_key'],
-            '_from': edge['_from'],
-            '_to': edge['_to']
-        } in inserted
 
 
 def test_fetch():
@@ -518,121 +565,74 @@ def test_fetch():
     assert found[0]['_key'] == '3'
 
 
-def test_update():
-    assert ecol.update({'value': 100}, {'bar': 100}) == 0
+def test_fetch_by_key():
+    ecol.insert_one(edge1)
+    edge = ecol.fetch_by_key('1')
+    assert edge['_key'] == '1'
+    assert edge['_from'] == edge1['_from']
+    assert edge['_to'] == edge1['_to']
+    assert ecol.fetch_by_key('2') is None
 
-    e1 = deepcopy(edge1)
-    e2 = deepcopy(edge2)
-    e3 = deepcopy(edge3)
-    e4 = deepcopy(edge4)
+    old_rev = edge['_rev']
+    new_rev = str(int(old_rev) + 1)
+    assert ecol.fetch_by_key('1', rev=old_rev) == edge
 
-    e1['value'] = 100
-    e2['value'] = 100
-    e3['value'] = 200
-    e4['value'] = 300
+    with pytest.raises(DocumentRevisionError):
+        ecol.fetch_by_key('1', rev=new_rev)
 
-    inserted = [e1, e2, e3, e4]
+
+def test_fetch_by_keys():
+    assert ecol.fetch_by_keys(['1', '2', '3', '4', '5']) == []
+    expected = [edge1, edge2, edge3, edge4]
+    ecol.insert_many(expected)
+    assert ecol.fetch_by_keys([]) == []
+    assert expected == [
+        {'_key': edge['_key'], '_from': edge['_from'], '_to': edge['_to']}
+        for edge in ecol.fetch_by_keys(['1', '2', '3', '4'])
+    ]
+    assert expected == [
+        {'_key': edge['_key'], '_from': edge['_from'], '_to': edge['_to']}
+        for edge in ecol.fetch_by_keys(['1', '2', '3', '4', '5', '6'])
+    ]
+
+
+def test_fetch_all():
+    assert len(list(ecol.fetch_all())) == 0
+    inserted = [edge1, edge2, edge3, edge4]
     ecol.insert_many(inserted)
+    # for doc in inserted:
+    #     ecol.insert(doc)
+    fetched = list(ecol.fetch_all())
+    assert len(fetched) == len(inserted)
+    for edge in fetched:
+        assert {
+            '_key': edge['_key'],
+            '_from': edge['_from'],
+            '_to': edge['_to']
+        } in inserted
 
-    assert ecol.update({'value': 100}, {'new_value': 200}) == 2
-    for key in ['1', '2']:
-        assert ecol[key]['value'] == 100
-        assert ecol[key]['new_value'] == 200
+    # TODO ordering seems strange
+    assert len(list(ecol.fetch_all(offset=4))) == 0
+    fetched = list(ecol.fetch_all(offset=2))
+    assert len(fetched) == 2
 
-    assert ecol.update({'value': 200}, {'new_value': 100}) == 1
-    assert ecol['3']['value'] == 200
-    assert ecol['3']['new_value'] == 100
-
-    assert ecol.update(
-        {'value': 300},
-        {'value': None},
-        sync=True,
-        keep_none=True
-    ) == 1
-    assert ecol['4']['value'] is None
-    assert ecol.update(
-        {'value': 200},
-        {'value': None},
-        sync=True,
-        keep_none=False
-    ) == 1
-    assert 'value' not in ecol['3']
-    assert 'new_value' in ecol['3']
+    # TODO ordering seems strange
+    assert len(list(ecol.fetch_all(limit=0))) == 0
+    fetched = list(ecol.fetch_all(limit=2))
+    assert len(fetched) == 2
 
 
-def test_replace():
-    assert ecol.replace({'value': 100}, {'bar': 100}) == 0
-
-    e1 = deepcopy(edge1)
-    e2 = deepcopy(edge2)
-    e3 = deepcopy(edge3)
-    e4 = deepcopy(edge4)
-
-    e1['value'] = 100
-    e2['value'] = 100
-    e3['value'] = 200
-    e4['value'] = 300
-
-    inserted = [e1, e2, e3, e4]
+def test_fetch_random():
+    assert len(list(ecol.fetch_all())) == 0
+    inserted = [edge1, edge2, edge3, edge4]
     ecol.insert_many(inserted)
-
-    assert ecol.replace(
-        {'value': 200},
-        {'_from': e3['_from'], '_to': e3['_to'], 'new_value': 100}
-    ) == 1
-    assert 'value' not in ecol['3']
-    assert ecol['3']['new_value'] == 100
-
-    assert ecol.replace(
-        {'value': 100},
-        {'_from': e1['_from'], '_to': e1['_to'], 'new_value': 400}
-    ) == 2
-    for key in ['1', '2']:
-        assert 'value' not in ecol[key]
-        assert ecol[key]['new_value'] == 400
-
-    assert ecol.replace(
-        {'value': 500},
-        {'_from': e2['_from'], '_to': e2['_to'], 'new_value': 500}
-    ) == 0
-    for key in ['1', '2', '3', '4']:
-        assert ecol[key].get('new_value', None) != 500
-
-    assert ecol['4']['value'] == 300
-    assert 'new_value' not in ecol['4']
-
-
-def test_delete():
-    assert ecol.delete({'value': 100}) == 0
-
-    e1 = deepcopy(edge1)
-    e2 = deepcopy(edge2)
-    e3 = deepcopy(edge3)
-    e4 = deepcopy(edge4)
-
-    e1['value'] = 100
-    e2['value'] = 100
-    e3['value'] = 200
-    e4['value'] = 300
-
-    inserted = [e1, e2, e3, e4]
-    ecol.insert_many(inserted)
-
-    assert '3' in ecol
-    assert ecol.delete({'value': 200}) == 1
-    assert '3' not in ecol
-
-    assert '4' in ecol
-    assert ecol.delete({'value': 300}, sync=True) == 1
-    assert '4' not in ecol
-
-    assert ecol.delete({'value': 100}, limit=1) == 1
-    count = 0
-    for key in ['1', '2']:
-        if key in ecol:
-            assert ecol[key]['value'] == 100
-            count += 1
-    assert count == 1
+    for attempt in range(10):
+        edge = ecol.fetch_random()
+        assert {
+            '_key': edge['_key'],
+            '_from': edge['_from'],
+            '_to': edge['_to']
+        } in inserted
 
 
 def test_fetch_near():

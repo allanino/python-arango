@@ -104,7 +104,7 @@ class Database(object):
     # Collection Management #
     #########################
 
-    def list_collections(self):
+    def collections(self):
         """Return the names of the collections in the database.
 
         :returns: the names of the collections
@@ -148,7 +148,7 @@ class Database(object):
         :param name: the name of the collection
         :type name: str
         :param sync: wait for the operation to sync to disk
-        :type sync: bool
+        :type sync: bool | None
         :param compact: compact the collection
         :type compact: bool
         :param system: the collection is a system collection

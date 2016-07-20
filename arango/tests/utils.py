@@ -13,7 +13,7 @@ def generate_db_name(client):
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(client.list_databases())
+    existing = set(client.databases())
     while "test_database_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_database_{num:06d}".format(num=num)
@@ -28,7 +28,7 @@ def generate_col_name(database):
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(database.list_collections())
+    existing = set(database.collections())
     while "test_collection_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_collection_{num:06d}".format(num=num)
@@ -58,7 +58,7 @@ def generate_task_name(client):
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(task['name'] for task in client.list_tasks().values())
+    existing = set(task['name'] for task in client.tasks().values())
     while "test_task_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_task_{num:06d}".format(num=num)
@@ -73,7 +73,7 @@ def generate_user_name(client):
     :rtype: str
     """
     num = randint(100000, 999999)
-    existing = set(client.list_users())
+    existing = set(client.users())
     while "test_user_{num:06d}".format(num=num) in existing:
         num = randint(100000, 999999)
     return "test_user_{num:06d}".format(num=num)

@@ -27,8 +27,10 @@ class ArangoClient(object):
     :type password: str
     :param verify: check the connection during initialization
     :type verify: bool
-    :param client: the HTTP client
-    :type client: arango.clients.base.BaseHTTPClient | None
+    :param http_client: the HTTP client instance
+    :type http_client: arango.clients.base.BaseHTTPClient | None
+    :param enable_logging: log all API requests
+    :type enable_logging: bool
     """
 
     def __init__(self,
@@ -38,22 +40,25 @@ class ArangoClient(object):
                  username='root',
                  password='',
                  verify=True,
-                 client=None):
+                 http_client=None,
+                 enable_logging=True):
 
         self._protocol = protocol
         self._host = host
         self._port = port
         self._username = username
         self._password = password
-        self._client = client or DefaultHTTPClient()
+        self._client = http_client or DefaultHTTPClient()
+        self._logging = enable_logging
         self._conn = Connection(
             protocol=self._protocol,
             host=self._host,
             port=self._port,
+            database='_system',
             username=self._username,
             password=self._password,
-            client=self._client,
-            database='_system'
+            http_client=self._client,
+            enable_logging=self._logging
         )
         self._wal = WriteAheadLog(self._conn)
 
@@ -89,6 +94,10 @@ class ArangoClient(object):
     @property
     def client(self):
         return self._client
+
+    @property
+    def logging_enabled(self):
+        return self._logging
 
     @property
     def wal(self):
@@ -351,7 +360,7 @@ class ArangoClient(object):
     # Database Management #
     #######################
 
-    def list_databases(self, user_only=False):
+    def databases(self, user_only=False):
         """"Return the database names.
 
         :param user_only: list only the databases accessible by the user
@@ -381,10 +390,11 @@ class ArangoClient(object):
             protocol=self._protocol,
             host=self._host,
             port=self._port,
+            database=name,
             username=self._username,
             password=self._password,
-            client=self._client,
-            database=name
+            http_client=self._client,
+            enable_logging=self._logging
         ))
 
     def create_database(self, name, users=None):
@@ -414,7 +424,7 @@ class ArangoClient(object):
         :type name: str
         :param ignore_missing: ignore HTTP 404
         :type ignore_missing: bool
-        :returns: whether the database was dropped successfully
+        :returns: whether the database was deleted successfully
         :rtype: bool
         :raises: DatabaseDeleteError
         """
@@ -428,7 +438,7 @@ class ArangoClient(object):
     # User Management #
     ###################
 
-    def list_users(self):
+    def users(self):
         """Return details on all users.
 
         :returns: the mapping of usernames to user details
@@ -481,7 +491,7 @@ class ArangoClient(object):
         :type active: bool | None
         :param extra: any extra data about the user
         :type extra: dict | None
-        :param change_password: whether the user must change the password
+        :param change_password: the password must be changed
         :type change_password: bool | None
         :returns: the information about the new user
         :rtype: dict
@@ -521,7 +531,7 @@ class ArangoClient(object):
         :type active: bool | None
         :param extra: any extra data about the user
         :type extra: dict | None
-        :param change_password: whether the user must change the password
+        :param change_password: the password must be changed
         :type change_password: bool | None
         :returns: the information about the updated user
         :rtype: dict
@@ -565,7 +575,7 @@ class ArangoClient(object):
         :type active: bool | None
         :param extra: any extra data about the user
         :type extra: dict | None
-        :param change_password: whether the user must change the password
+        :param change_password: the password must be changed
         :type change_password: bool | None
         :returns: the information about the replaced user
         :rtype: dict
@@ -650,7 +660,7 @@ class ArangoClient(object):
     # Task Management #
     ###################
 
-    def list_tasks(self):
+    def tasks(self):
         """Return all server tasks that are currently active.
 
         :returns: server tasks that are currently active

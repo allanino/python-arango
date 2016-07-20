@@ -10,13 +10,15 @@ from arango.wrapper import APIWrapper
 class Graph(APIWrapper):
     """ArangoDB graph object.
 
+    A graph can have vertex and edge collections.
+
     :param connection: ArangoDB connection object
     :type connection: arango.connection.Connection
     :param name: the name of the graph
     :type name: str
     """
 
-    _normal_methods = {
+    _standard_methods = {
         'vertex_collection', 'v',
         'edge_collection', 'e',
         'name',
@@ -56,11 +58,11 @@ class Graph(APIWrapper):
         return EdgeCollection(self._conn, self._name, name)
 
     def properties(self):
-        """Return the graph options.
+        """Return the graph properties.
 
-        :returns: the graph options
+        :returns: the graph properties
         :rtype: dict
-        :raises: GraphOptionsGetError
+        :raises: GraphGetPropertiesError
         """
         request = Request(
             method='get',
@@ -69,7 +71,7 @@ class Graph(APIWrapper):
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise GraphOptionsGetError(res)
+                raise GraphGetPropertiesError(res)
             graph = res.body['graph']
             return {
                 'id': graph['_id'],
@@ -83,11 +85,12 @@ class Graph(APIWrapper):
     ################################
 
     def orphan_collections(self):
-        """Return the orphan (vertex) collections of the graph.
+        """Return the orphan vertex collections of the graph.
 
-        :returns: the names of the orphan collections
+        :returns: the orphan vertex collections
         :rtype: dict
-        :raises: GraphOrphanCollectionListError
+        :raises:
+        OrphanCollectionListError
         """
         request = Request(
             method='get',
@@ -297,8 +300,7 @@ class Graph(APIWrapper):
         """Execute a graph traversal and return the visited vertices.
 
         For more details on ``init``, ``filter``, ``visitor``, ``expander``
-        and ``sort`` please refer to the ArangoDB HTTP API documentation:
-        https://docs.arangodb.com/HttpTraversal/README.html
+        and ``sort``, refer to the ArangoDB HTTP API documentation.
 
         :param start: the ID of the start vertex
         :type start: str

@@ -110,20 +110,20 @@ def test_unload():
 def test_rotate():
     # No journal should exist yet
     with pytest.raises(CollectionRotateError):
-        col.rotate_journal()
+        col.rotate()
 
 
 def test_checksum():
-    assert col.checksum(revision=True, data=False) == 0
-    assert col.checksum(revision=True, data=True) == 0
-    assert col.checksum(revision=False, data=False) == 0
-    assert col.checksum(revision=False, data=True) == 0
+    assert col.checksum(include_rev=True, include_data=False) == 0
+    assert col.checksum(include_rev=True, include_data=True) == 0
+    assert col.checksum(include_rev=False, include_data=False) == 0
+    assert col.checksum(include_rev=False, include_data=True) == 0
 
     col.insert_one({'value': 'bar'})
-    assert col.checksum(revision=True, data=False) > 0
-    assert col.checksum(revision=True, data=True) > 0
-    assert col.checksum(revision=False, data=False) > 0
-    assert col.checksum(revision=False, data=True) > 0
+    assert col.checksum(include_rev=True, include_data=False) > 0
+    assert col.checksum(include_rev=True, include_data=True) > 0
+    assert col.checksum(include_rev=False, include_data=False) > 0
+    assert col.checksum(include_rev=False, include_data=True) > 0
 
 
 def test_truncate():
@@ -205,40 +205,36 @@ def test_insert_many():
     assert 'details' not in result
 
 
-def test_fetch_by_key():
-    col.insert_one({'_key': '1', 'value': 100})
-    doc = col.fetch_by_key('1')
-    assert doc['value'] == 100
-
-    old_rev = doc['_rev']
-    new_rev = str(int(old_rev) + 1)
-
-    assert col.fetch_by_key('2') is None
-    assert col.fetch_by_key('1', rev=old_rev) == doc
-
-    with pytest.raises(DocumentRevisionError):
-        col.fetch_by_key('1', rev=new_rev)
-
-
-def test_fetch_by_keys():
-    assert col.fetch_by_keys(['1', '2', '3', '4', '5']) == []
-    expected = [
+def test_update():
+    assert col.update({'value': 100}, {'bar': 100}) == 0
+    col.insert_many([
         {'_key': '1', 'value': 100},
-        {'_key': '2', 'value': 200},
-        {'_key': '3', 'value': 300},
-        {'_key': '4', 'value': 400},
-        {'_key': '5', 'value': 500},
-    ]
-    col.insert_many(expected)
-    assert col.fetch_by_keys([]) == []
-    assert expected == [
-        {'_key': doc['_key'], 'value': doc['value']}
-        for doc in col.fetch_by_keys(['1', '2', '3', '4', '5'])
-    ]
-    assert expected == [
-        {'_key': doc['_key'], 'value': doc['value']}
-        for doc in col.fetch_by_keys(['1', '2', '3', '4', '5', '6'])
-    ]
+        {'_key': '2', 'value': 100},
+        {'_key': '3', 'value': 100},
+        {'_key': '4', 'value': 200},
+        {'_key': '5', 'value': 300},
+    ])
+
+    assert col.update({'value': 200}, {'bar': 100}) == 1
+    assert col['4']['value'] == 200
+    assert col['4']['bar'] == 100
+
+    assert col.update({'value': 100}, {'bar': 100}) == 3
+    for key in ['1', '2', '3']:
+        assert col[key]['value'] == 100
+        assert col[key]['bar'] == 100
+
+    assert col['5']['value'] == 300
+    assert 'bar' not in col['5']
+
+    assert col.update(
+        {'value': 300}, {'value': None}, sync=True, keep_none=True
+    ) == 1
+    assert col['5']['value'] is None
+    assert col.update(
+        {'value': 200}, {'value': None}, sync=True, keep_none=False
+    ) == 1
+    assert 'value' not in col['4']
 
 
 def test_update_one():
@@ -291,6 +287,29 @@ def test_update_one():
     assert 'value' not in col['1']
 
 
+def test_replace():
+    assert col.replace({'value': 100}, {'bar': 100}) == 0
+    col.insert_many([
+        {'_key': '1', 'value': 100},
+        {'_key': '2', 'value': 100},
+        {'_key': '3', 'value': 100},
+        {'_key': '4', 'value': 200},
+        {'_key': '5', 'value': 300},
+    ])
+
+    assert col.replace({'value': 200}, {'bar': 100}) == 1
+    assert 'value' not in col['4']
+    assert col['4']['bar'] == 100
+
+    assert col.replace({'value': 100}, {'bar': 100}) == 3
+    for key in ['1', '2', '3']:
+        assert 'value' not in col[key]
+        assert col[key]['bar'] == 100
+
+    assert col['5']['value'] == 300
+    assert 'bar' not in col['5']
+
+
 def test_replace_one():
     doc = {'_key': '1', 'value': 100}
     col.insert_one(doc)
@@ -326,7 +345,6 @@ def test_replace_one():
     with pytest.raises(DocumentReplaceError):
         col.replace_one({'_key': '2', 'value': 600})
     assert col['1']['value'] == 400
-
 
 
 def test_delete():
@@ -383,7 +401,7 @@ def test_delete_one():
     assert '3' in col
     assert len(col) == 1
 
-    assert col.delete_one(doc4, ignore_missing=True) is None
+    assert col.delete_one(doc4, ignore_missing=True) is False
     with pytest.raises(DocumentDeleteError):
         col.delete_one(doc4, ignore_missing=False)
     assert len(col) == 1
@@ -421,6 +439,76 @@ def test_delete_by_keys():
     assert result['removed'] == 2
     assert result['ignored'] == 1
     assert len(col) == 0
+
+
+def test_fetch():
+    assert list(col.fetch({'value': 100})) == []
+    inserted = [
+        {'_key': '1', 'value': 100},
+        {'_key': '2', 'value': 100},
+        {'_key': '3', 'value': 100},
+        {'_key': '4', 'value': 200},
+        {'_key': '5', 'value': 300},
+    ]
+    col.insert_many(inserted)
+
+    found = list(col.fetch({'value': 100}))
+    assert len(found) == 3
+    for doc in found:
+        assert doc['_key'] in ['1', '2', '3']
+        assert {'_key': doc['_key'], 'value': doc['value']} in inserted
+
+    found = list(col.fetch({'value': 100}, offset=1))
+    assert len(found) == 2
+    for doc in found:
+        assert doc['_key'] in ['1', '2', '3']
+        assert {'_key': doc['_key'], 'value': doc['value']} in inserted
+
+    found = list(col.fetch({}, limit=4))
+    assert len(found) == 4
+    for doc in found:
+        assert doc['_key'] in ['1', '2', '3', '4', '5']
+        assert {'_key': doc['_key'], 'value': doc['value']} in inserted
+
+    found = list(col.fetch({'value': 200}))
+    assert len(found) == 1
+    assert found[0]['_key'] == '4'
+
+
+def test_fetch_by_key():
+    col.insert_one({'_key': '1', 'value': 100})
+    doc = col.fetch_by_key('1')
+    assert doc['value'] == 100
+
+    old_rev = doc['_rev']
+    new_rev = str(int(old_rev) + 1)
+
+    assert col.fetch_by_key('2') is None
+    assert col.fetch_by_key('1', rev=old_rev) == doc
+
+    with pytest.raises(DocumentRevisionError):
+        col.fetch_by_key('1', rev=new_rev)
+
+
+def test_fetch_by_keys():
+    assert col.fetch_by_keys(['1', '2', '3', '4', '5']) == []
+    expected = [
+        {'_key': '1', 'value': 100},
+        {'_key': '2', 'value': 200},
+        {'_key': '3', 'value': 300},
+        {'_key': '4', 'value': 400},
+        {'_key': '5', 'value': 500},
+    ]
+    col.insert_many(expected)
+    assert col.fetch_by_keys([]) == []
+    assert expected == [
+        {'_key': doc['_key'], 'value': doc['value']}
+        for doc in col.fetch_by_keys(['1', '2', '3', '4', '5'])
+    ]
+    assert expected == [
+        {'_key': doc['_key'], 'value': doc['value']}
+        for doc in col.fetch_by_keys(['1', '2', '3', '4', '5', '6'])
+    ]
 
 
 def test_fetch_all():
@@ -463,95 +551,6 @@ def test_fetch_random():
     for attempt in range(10):
         doc = col.fetch_random()
         assert {'_key': doc['_key'], 'value': doc['value']} in inserted
-
-
-def test_fetch():
-    assert list(col.fetch({'value': 100})) == []
-    inserted = [
-        {'_key': '1', 'value': 100},
-        {'_key': '2', 'value': 100},
-        {'_key': '3', 'value': 100},
-        {'_key': '4', 'value': 200},
-        {'_key': '5', 'value': 300},
-    ]
-    col.insert_many(inserted)
-
-    found = list(col.fetch({'value': 100}))
-    assert len(found) == 3
-    for doc in found:
-        assert doc['_key'] in ['1', '2', '3']
-        assert {'_key': doc['_key'], 'value': doc['value']} in inserted
-
-    found = list(col.fetch({'value': 100}, offset=1))
-    assert len(found) == 2
-    for doc in found:
-        assert doc['_key'] in ['1', '2', '3']
-        assert {'_key': doc['_key'], 'value': doc['value']} in inserted
-
-    found = list(col.fetch({}, limit=4))
-    assert len(found) == 4
-    for doc in found:
-        assert doc['_key'] in ['1', '2', '3', '4', '5']
-        assert {'_key': doc['_key'], 'value': doc['value']} in inserted
-
-    found = list(col.fetch({'value': 200}))
-    assert len(found) == 1
-    assert found[0]['_key'] == '4'
-
-
-def test_update():
-    assert col.update({'value': 100}, {'bar': 100}) == 0
-    col.insert_many([
-        {'_key': '1', 'value': 100},
-        {'_key': '2', 'value': 100},
-        {'_key': '3', 'value': 100},
-        {'_key': '4', 'value': 200},
-        {'_key': '5', 'value': 300},
-    ])
-
-    assert col.update({'value': 200}, {'bar': 100}) == 1
-    assert col['4']['value'] == 200
-    assert col['4']['bar'] == 100
-
-    assert col.update({'value': 100}, {'bar': 100}) == 3
-    for key in ['1', '2', '3']:
-        assert col[key]['value'] == 100
-        assert col[key]['bar'] == 100
-
-    assert col['5']['value'] == 300
-    assert 'bar' not in col['5']
-
-    assert col.update(
-        {'value': 300}, {'value': None}, sync=True, keep_none=True
-    ) == 1
-    assert col['5']['value'] is None
-    assert col.update(
-        {'value': 200}, {'value': None}, sync=True, keep_none=False
-    ) == 1
-    assert 'value' not in col['4']
-
-
-def test_replace():
-    assert col.replace({'value': 100}, {'bar': 100}) == 0
-    col.insert_many([
-        {'_key': '1', 'value': 100},
-        {'_key': '2', 'value': 100},
-        {'_key': '3', 'value': 100},
-        {'_key': '4', 'value': 200},
-        {'_key': '5', 'value': 300},
-    ])
-
-    assert col.replace({'value': 200}, {'bar': 100}) == 1
-    assert 'value' not in col['4']
-    assert col['4']['bar'] == 100
-
-    assert col.replace({'value': 100}, {'bar': 100}) == 3
-    for key in ['1', '2', '3']:
-        assert 'value' not in col[key]
-        assert col[key]['bar'] == 100
-
-    assert col['5']['value'] == 300
-    assert 'bar' not in col['5']
 
 
 def test_fetch_near():

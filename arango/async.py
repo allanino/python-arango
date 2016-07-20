@@ -40,7 +40,7 @@ class AsyncExecution(Connection):
             port=connection.port,
             username=connection.username,
             password=connection.password,
-            client=connection.client,
+            http_client=connection.client,
             database=connection.database
         )
         self._return_result = return_result
@@ -118,6 +118,14 @@ class AsyncExecution(Connection):
         :rtype: arango.graph.Graph
         """
         return Graph(self, name)
+
+    def c(self, name):
+        """Alias for self.collection."""
+        return self.collection(name)
+
+    def g(self, name):
+        """Alias for self.graph."""
+        return self.graph(name)
 
 
 class AsyncJob(object):
@@ -240,11 +248,19 @@ class AsyncJob(object):
         elif res.status_code == 400:
             raise AsyncJobInvalidError(res)
         elif res.status_code == 404:
-            raise AsyncJobNotFoundError(res)
+            # TODO: figure out a more elegant way to differentiate b/w 404s
+            print(res.body)
+            if (
+                res.body is not None and
+                res.body.get('errorNum') == 404 and
+                res.body.get('errorMessage') == 'not found'
+            ):
+                raise AsyncJobNotFoundError(res)
+            return self._handler(res)
         else:
             raise AsyncJobResultGetError(res)
 
-    def clear(self, ignore_missing=False):
+    def delete(self, ignore_missing=False):
         """Clear the result of the job from the server if any.
 
         If the result is deleted successfully, boolean True is returned. If

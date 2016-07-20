@@ -552,7 +552,7 @@ class GraphDeleteError(ArangoError):
     """Failed to delete the graph."""
 
 
-class GraphOptionsGetError(ArangoError):
+class GraphGetPropertiesError(ArangoError):
     """Failed to get the graph property."""
 
 

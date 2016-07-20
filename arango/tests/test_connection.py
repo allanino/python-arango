@@ -124,16 +124,16 @@ def test_endpoints():
 def test_database_management():
     # Test list databases
     # TODO something wrong here
-    result = arango_client.list_databases()
+    result = arango_client.databases()
     assert '_system' in result
-    result = arango_client.list_databases(user_only=True)
+    result = arango_client.databases(user_only=True)
     assert '_system' in result
-    assert db_name not in arango_client.list_databases()
+    assert db_name not in arango_client.databases()
 
     # Test create database
     result = arango_client.create_database(db_name)
     assert isinstance(result, Database)
-    assert db_name in arango_client.list_databases()
+    assert db_name in arango_client.databases()
 
     # Test get after create database
     assert isinstance(arango_client.db(db_name), Database)
@@ -144,12 +144,12 @@ def test_database_management():
         arango_client.create_database(db_name)
 
     # Test list after create database
-    assert db_name in arango_client.list_databases()
+    assert db_name in arango_client.databases()
 
     # Test delete database
     result = arango_client.delete_database(db_name)
     assert result is True
-    assert db_name not in arango_client.list_databases()
+    assert db_name not in arango_client.databases()
 
     # Test delete missing database
     with pytest.raises(DatabaseDeleteError):
@@ -162,7 +162,7 @@ def test_database_management():
 
 def test_user_management():
     # Test get users
-    users = arango_client.list_users()
+    users = arango_client.users()
     assert isinstance(users, dict)
     assert 'root' in users
 
@@ -171,7 +171,7 @@ def test_user_management():
     assert 'extra'in root_user
     assert 'change_password' in root_user
 
-    assert username not in arango_client.list_users()
+    assert username not in arango_client.users()
 
     # Test create user
     user = arango_client.create_user(
@@ -184,7 +184,7 @@ def test_user_management():
     assert user['active'] is True
     assert user['extra'] == {'hello': 'world'}
     assert user['change_password'] is False
-    assert username in arango_client.list_users()
+    assert username in arango_client.users()
 
     # Test create duplicate user
     with pytest.raises(UserCreateError):
@@ -253,7 +253,7 @@ def test_user_management():
     # Test delete user
     result = arango_client.delete_user(username)
     assert result is True
-    assert username not in arango_client.list_users()
+    assert username not in arango_client.users()
 
     # Test delete missing user
     with pytest.raises(UserDeleteError):
@@ -268,7 +268,7 @@ def test_task_management():
     global task_id
 
     # Test get tasks
-    tasks = arango_client.list_tasks()
+    tasks = arango_client.tasks()
     assert isinstance(tasks, dict)
     for task in tasks.values():
         assert 'command' in task
@@ -278,7 +278,7 @@ def test_task_management():
         assert 'name' in task
 
     # Test get task
-    tasks = arango_client.list_tasks()
+    tasks = arango_client.tasks()
     if tasks:
         chosen_task_id = random.choice(list(tasks.keys()))
         retrieved_task = arango_client.task(chosen_task_id)
@@ -287,7 +287,7 @@ def test_task_management():
     cmd = "(function(params) { require('internal').print(params); })(params)"
 
     # Test create task
-    assert task_name not in arango_client.list_tasks()
+    assert task_name not in arango_client.tasks()
     task = arango_client.create_task(
         name=task_name,
         command=cmd,
@@ -296,8 +296,8 @@ def test_task_management():
         offset=3,
     )
     task_id = task['id']
-    assert task_id in arango_client.list_tasks()
-    assert task_name == arango_client.list_tasks()[task_id]['name']
+    assert task_id in arango_client.tasks()
+    assert task_name == arango_client.tasks()[task_id]['name']
 
     # Test get after create task
     task = arango_client.task(task_id)
@@ -319,7 +319,7 @@ def test_task_management():
     # Test delete task
     result = arango_client.delete_task(task['id'])
     assert result is True
-    assert task_id not in arango_client.list_tasks()
+    assert task_id not in arango_client.tasks()
 
     # Test delete missing task
     with pytest.raises(TaskDeleteError):

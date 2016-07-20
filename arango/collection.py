@@ -37,7 +37,7 @@ class BaseCollection(APIWrapper):
         self._name = name
 
     def __iter__(self):
-        """Iterate through all documents in the collection.
+        """Iterate through the documents in the collection.
 
         :returns: the document cursor
         :rtype: arango.cursor.Cursor
@@ -241,6 +241,8 @@ class BaseCollection(APIWrapper):
     def set_properties(self, sync=None, journal_size=None):
         """Set the collection properties.
 
+        Only ``sync`` and ``journal_size`` are configurable.
+
         :param sync: wait for the operation to sync to disk
         :type sync: bool | None
         :param journal_size: the journal size
@@ -249,6 +251,7 @@ class BaseCollection(APIWrapper):
         :rtype: dict
         :raises: CollectionSetPropertiesError
         """
+
         data = {}
         if sync is not None:
             data['waitForSync'] = sync
@@ -323,7 +326,7 @@ class BaseCollection(APIWrapper):
 
         return request, handler
 
-    def rotate_journal(self):
+    def rotate(self):
         """Rotate the collection journal.
 
         :returns: the result of the operation
@@ -342,13 +345,13 @@ class BaseCollection(APIWrapper):
 
         return request, handler
 
-    def checksum(self, revision=False, data=False):
+    def checksum(self, include_rev=False, include_data=False):
         """Return the collection checksum.
 
-        :param revision: include the revision in the checksum calculation
-        :type revision: bool
-        :param data: include the data in the checksum calculation
-        :type data: bool
+        :param include_rev: include the revision in the checksum calculation
+        :type include_rev: bool
+        :param include_data: include the data in the checksum calculation
+        :type include_data: bool
         :returns: the collection checksum
         :rtype: int
         :raises: CollectionGetChecksumError
@@ -356,7 +359,10 @@ class BaseCollection(APIWrapper):
         request = Request(
             method='get',
             endpoint='/_api/collection/{}/checksum'.format(self._name),
-            params={'withRevision': revision, 'withData': data}
+            params={
+                'withRevision': include_rev,
+                'withData': include_data
+            }
         )
 
         def handler(res):
@@ -411,7 +417,7 @@ class BaseCollection(APIWrapper):
         return request, handler
 
     def has(self, key):
-        """Check if a document exists in the collection.
+        """Check if a document exists by key in the collection.
 
         :param key: the document key
         :type key: str
@@ -432,10 +438,6 @@ class BaseCollection(APIWrapper):
             raise CollectionContainsError(res)
 
         return request, handler
-
-    ############################
-    # Document Import & Export #
-    ############################
 
     # TODO look into this endpoint for better documentation and testing
     def export(self, flush=None, max_wait=None, count=None, batch_size=None,
@@ -487,82 +489,6 @@ class BaseCollection(APIWrapper):
             if res.status_code not in HTTP_OK:
                 raise DocumentsExportError(res)
             return Cursor(self._conn, res.body)
-
-        return request, handler
-
-    ##################
-    # Simple Queries #
-    ##################
-
-    def fetch_all(self, offset=None, limit=None):
-        """Return all documents in the collection.
-
-        :param offset: the number of documents to skip
-        :type offset: int
-        :param limit: the max number of documents to return
-        :type limit: int
-        :returns: the document cursor
-        :rtype: arango.cursor.Cursor
-        :raises: DocumentFetchError
-        """
-        data = {'collection': self._name}
-        if offset is not None:
-            data['skip'] = offset
-        if limit is not None:
-            data['limit'] = limit
-
-        request = Request(
-            method='put',
-            endpoint='/_api/simple/all',
-            data=data
-        )
-
-        def handler(res):
-            if res.status_code not in HTTP_OK:
-                raise DocumentFetchError(res)
-            return Cursor(self._conn, res.body)
-
-        return request, handler
-
-    def fetch_random(self):
-        """Return a random document from the collection.
-
-        :returns: a random document
-        :rtype: dict
-        :raises: DocumentFetchError
-        """
-        request = Request(
-            method='put',
-            endpoint='/_api/simple/any',
-            data={'collection': self._name}
-        )
-
-        def handler(res):
-            if res.status_code not in HTTP_OK:
-                raise DocumentFetchError(res)
-            return res.body['document']
-
-        return request, handler
-
-    def fetch_by_keys(self, keys):
-        """Return all documents whose key is found in ``keys``.
-
-        :param keys: the list of document keys
-        :type keys: list
-        :returns: the list of documents
-        :rtype: list
-        :raises: DocumentFetchError
-        """
-        request = Request(
-            method='put',
-            endpoint='/_api/simple/lookup-by-keys',
-            data={'collection': self._name, 'keys': keys}
-        )
-
-        def handler(res):
-            if res.status_code not in HTTP_OK:
-                raise DocumentFetchError(res)
-            return res.body['documents']
 
         return request, handler
 
@@ -629,6 +555,78 @@ class BaseCollection(APIWrapper):
                     return first
                 else:
                     raise DocumentFetchError('Found more than one document')
+
+        return request, handler
+
+    def fetch_by_keys(self, keys):
+        """Return all documents whose key is found in ``keys``.
+
+        :param keys: the list of document keys
+        :type keys: list
+        :returns: the list of documents
+        :rtype: list
+        :raises: DocumentFetchError
+        """
+        request = Request(
+            method='put',
+            endpoint='/_api/simple/lookup-by-keys',
+            data={'collection': self._name, 'keys': keys}
+        )
+
+        def handler(res):
+            if res.status_code not in HTTP_OK:
+                raise DocumentFetchError(res)
+            return res.body['documents']
+
+        return request, handler
+
+    def fetch_all(self, offset=None, limit=None):
+        """Return all documents in the collection.
+
+        :param offset: the number of documents to skip
+        :type offset: int
+        :param limit: the max number of documents to return
+        :type limit: int
+        :returns: the document cursor
+        :rtype: arango.cursor.Cursor
+        :raises: DocumentFetchError
+        """
+        data = {'collection': self._name}
+        if offset is not None:
+            data['skip'] = offset
+        if limit is not None:
+            data['limit'] = limit
+
+        request = Request(
+            method='put',
+            endpoint='/_api/simple/all',
+            data=data
+        )
+
+        def handler(res):
+            if res.status_code not in HTTP_OK:
+                raise DocumentFetchError(res)
+            return Cursor(self._conn, res.body)
+
+        return request, handler
+
+    def fetch_random(self):
+        """Return a random document from the collection.
+
+        :returns: a random document
+        :rtype: dict
+        :raises: DocumentFetchError
+        """
+        request = Request(
+            method='put',
+            endpoint='/_api/simple/any',
+            data={'collection': self._name}
+        )
+
+        def handler(res):
+            if res.status_code not in HTTP_OK:
+                raise DocumentFetchError(res)
+            return res.body['document']
 
         return request, handler
 
@@ -1050,7 +1048,16 @@ class BaseCollection(APIWrapper):
 
 
 class Collection(BaseCollection):
-    """Wrapper for ArangoDB's collection-specific APIs.
+    """ArangoDB collection.
+
+    A collection consists of documents. It is uniquely identified by its name,
+    which must consist only of alphanumeric characters, hyphen and underscore
+    characters. There are two collection types: "document" and "edge" and the
+    default type is "document".
+
+    Be default, collections use the traditional key generator, which generates
+    key values in a non-deterministic fashion. A deterministic, auto-increment
+    key generator is also available.
 
     :param connection: ArangoDB database connection object
     :type connection: arango.connection.Connection
@@ -1079,14 +1086,10 @@ class Collection(BaseCollection):
         :rtype: dict | None
         :raises: DocumentRevisionError, DocumentFetchError
         """
-        headers = {}
-        if rev is not None:
-            headers['If-Match'] = rev
-
         request = Request(
             method='get',
             endpoint='/_api/document/{}/{}'.format(self._name, key),
-            headers=headers
+            headers={'If-Match': rev} if rev else {}
         )
 
         def handler(res):
@@ -1104,12 +1107,12 @@ class Collection(BaseCollection):
         """Insert a new document into the collection.
 
         If the "_key" field is present in ``document``, its value is used as
-        the key of the new document. The key must be unique in the collection.
+        the key of the new document. Otherwise, the key is auto-generated.
 
         :param document: the document body
         :type document: dict
         :param sync: wait for the operation to sync to disk
-        :type sync: bool
+        :type sync: bool | None
         :returns: the ID, revision and key of the document
         :rtype: dict
         :raises: DocumentInsertError
@@ -1183,7 +1186,7 @@ class Collection(BaseCollection):
         :param keep_none: keep the fields whose value is None
         :type keep_none: bool
         :param sync: wait for the operation to sync to disk
-        :type sync: bool
+        :type sync: bool | None
         :returns: the number of documents updated
         :rtype: int
         :raises: DocumentUpdateError
@@ -1213,7 +1216,7 @@ class Collection(BaseCollection):
         return request, handler
 
     def update_one(self, document, merge=True, keep_none=True, sync=None):
-        """Update a document (by key) in the collection.
+        """Update a document by its key in the collection.
 
         The "_key" field must be present in ``document``.
 
@@ -1225,18 +1228,18 @@ class Collection(BaseCollection):
         merged rather than replaced.
 
         If ``keep_none`` is set to True, the fields whose value is None are
-        retained in the document. Otherwise, the field is removed from the
+        retained in the document. Otherwise, the fields are removed from the
         document completely.
 
-        :param document: the document with new values
+        :param document: the document (partial or full) with the new values
         :type document: dict
         :param merge: merge sub-dictionaries rather than replace
         :type merge: bool
-        :param keep_none: keep fields items with value None
+        :param keep_none: keep fields with value None
         :type keep_none: bool
         :param sync: wait for the update to sync to disk
-        :type sync: bool
-        :returns: the ID, revision and key of the updated vertex
+        :type sync: bool | None
+        :returns: the ID, revision and key of the updated document
         :rtype: dict
         :raises: DocumentRevisionError, DocumentUpdateError
         """
@@ -1308,7 +1311,7 @@ class Collection(BaseCollection):
         return request, handler
 
     def replace_one(self, document, sync=None):
-        """Replace a document (by key) in the collection.
+        """Replace a document by its key in the collection.
 
         The "_key" field must be present in ``document``. For edge collections,
         The "_from" and "_to" fields must also be present.
@@ -1362,7 +1365,7 @@ class Collection(BaseCollection):
         :param limit: the the max number of documents to delete
         :type limit: int
         :param sync: wait for the operation to sync to disk
-        :type sync: bool
+        :type sync: bool | None
         :returns: the number of documents deleted and ignored
         :rtype: dict
         :raises: DocumentDeleteError
@@ -1386,18 +1389,23 @@ class Collection(BaseCollection):
 
         return request, handler
 
-    def delete_one(self, document, sync=None, ignore_missing=True):
-        """Delete a document (by key) from the collection.
+    def delete_one(self, document, ignore_missing=True, sync=None):
+        """Delete a document by its key from the collection.
 
         The "_key" field must be present in ``document``.
 
+        If the "_rev" field is present in ``document``, its value is compared
+        against the revision of the target document. DocumentRevisionError is
+        raised if the revisions do not match.
+
         :param document: the document to delete
+        :type document: dict
         :param sync: wait for the operation to sync to disk
         :type sync: bool | None
         :param ignore_missing: ignore missing documents
         :type ignore_missing: bool
-        :returns: the id, revision and key of the deleted document
-        :rtype: dict
+        :returns: whether the document was deleted successfully
+        :rtype: bool
         :raises: DocumentRevisionError, DocumentDeleteError
         """
         _validate_document(document)
@@ -1424,7 +1432,7 @@ class Collection(BaseCollection):
                 raise DocumentRevisionError(res)
             elif res.status_code == 404:
                 if ignore_missing:
-                    return None
+                    return False
                 raise DocumentDeleteError(res)
             elif res.status_code not in HTTP_OK:
                 raise DocumentDeleteError(res)
@@ -1500,8 +1508,30 @@ class Collection(BaseCollection):
 
 
 class VertexCollection(BaseCollection):
+    """ArangoDB vertex collection.
 
-    _bypass_methods = {'name', 'graph'}
+    A vertex collection consists of vertex documents. It is uniquely identified
+    by its name, which must consist only of alphanumeric characters, hyphen and
+    the underscore characters. Vertex collections share their namespace with
+    other types of collections.
+
+    A vertex document can be of a standard collection or an edge collection.
+    The documents in a vertex collection are fully accessible from a standard
+    collection. However, accessing documents through a vertex collection gives
+    the following guarantees:
+
+    * All modifications are executed in transactions
+    * If a vertex is deleted all connected edges are also deleted
+
+    :param connection: ArangoDB database connection object
+    :type connection: arango.connection.Connection
+    :param graph: the name of the graph
+    :type graph: str
+    :param name: the name of the vertex collection
+    :type name: str
+    """
+
+    _standard_methods = {'name', 'graph_name'}
 
     def __init__(self, connection, graph, name):
         super(VertexCollection, self).__init__(connection, name)
@@ -1513,7 +1543,7 @@ class VertexCollection(BaseCollection):
         )
 
     @property
-    def graph(self):
+    def graph_name(self):
         """Return the name of the graph.
 
         :returns: the name of the graph
@@ -1521,23 +1551,58 @@ class VertexCollection(BaseCollection):
         """
         return self._graph
 
-    def insert_one(self, document, sync=False):
-        """Insert a vertex document in the the collection.
+    def fetch_by_key(self, key, rev=None):
+        """Fetch a document by key from the vertex collection.
+
+        If ``rev`` is given, its value is compared against the revision of the
+        target document. DocumentRevisionError is raised if the revisions do
+        not match.
+
+        :param key: the document key
+        :type key: str
+        :param rev: the document revision
+        :type rev: str | None
+        :returns: the vertex document or None if not found
+        :rtype: dict | None
+        :raises: DocumentRevisionError, DocumentFetchError
+        """
+        request = Request(
+            method='get',
+            endpoint='/_api/gharial/{}/vertex/{}/{}'.format(
+                self._graph, self._name, key
+            ),
+            headers={'If-Match': rev} if rev else {}
+        )
+
+        def handler(res):
+            if res.status_code == 412:
+                raise DocumentRevisionError(res)
+            elif res.status_code == 404:
+                return None
+            elif res.status_code not in HTTP_OK:
+                raise DocumentFetchError(res)
+            return res.body['vertex']
+
+        return request, handler
+
+    def insert_one(self, document, sync=None):
+        """Insert a new document into the vertex collection.
 
         If the "_key" field is present in ``document``, its value is used as
-        the key of the new document. The key must be unique in the collection.
+        the key of the new document. Otherwise, the key is auto-generated.
 
         :param document: the document body
         :type document: dict
         :param sync: wait for the operation to sync to disk
-        :type sync: bool
+        :type sync: bool | None
         :returns: the ID, revision and key of the document
         :rtype: dict
-        :raises: DocumentInsertError
+        :raises: KeyError, DocumentInsertError
         """
         params = {}
         if sync is not None:
             params['waitForSync'] = sync
+
         request = Request(
             method='post',
             endpoint='/_api/gharial/{}/vertex/{}'.format(
@@ -1554,187 +1619,184 @@ class VertexCollection(BaseCollection):
 
         return request, handler
 
-    def fetch_by_key(self, key, rev=None):
-        """Return the vertex with specified key from the vertex collection.
+    def update_one(self, document, keep_none=True, sync=None):
+        """Update a document by its key in the vertex collection.
 
-        If ``revision`` is specified, its value must match against the
-        revision of the retrieved vertex.
+        The "_key" field must be present in ``document``.
 
-        :param key: the vertex key
-        :type key: str
-        :param rev: the vertex revision
-        :type rev: str | None
-        :returns: the requested vertex or None if not found
-        :rtype: dict | None
-        :raises: VertexRevisionError, VertexGetError
-        """
-        request = Request(
-            method='get',
-            endpoint='/_api/gharial/{}/vertex/{}/{}'.format(
-                self._graph, self._name, key
-            ),
-            params={'rev': rev} if rev is not None else {}
-        )
+        If the "_rev" field is present in ``document``, its value is compared
+        against the revision of the target document. DocumentRevisionError is
+        raised if the revisions do not match.
 
-        def handler(res):
-            if res.status_code == 412:
-                raise VertexRevisionError(res)
-            elif res.status_code == 404:
-                return None
-            elif res.status_code not in HTTP_OK:
-                raise VertexGetError(res)
-            return res.body['vertex']
+        If ``keep_none`` is set to True, the fields whose value is None are
+        retained in the document. Otherwise, the fields are removed from the
+        document completely.
 
-        return request, handler
-
-    def update_one(self, key, data, rev=None, sync=False, keep_none=True):
-        """Update the specified vertex in the graph.
-
-        If ``keep_none`` is set to True, fields with value None are retained.
-        Otherwise, the fields are removed completely from the vertex.
-
-        If ``data`` contains the ``_key`` field, the field is ignored.
-
-        If ``data`` contains the ``_rev`` field, or if ``revision`` is given,
-        the revision of the target vertex must match against its value.
-        Otherwise, VertexRevisionError is raised.
-
-        :param key: the vertex key
-        :type key: str
-        :param data: the body to update the vertex with
-        :type data: dict
-        :param rev: the vertex revision
-        :type rev: str | None
+        :param document: the partial/full document with the updated values
+        :type document: dict
         :param keep_none: keep fields with value None
         :type keep_none: bool
         :param sync: wait for the update to sync to disk
-        :type sync: bool
-        :returns: the ID, revision and key of the updated vertex
+        :type sync: bool | None
+        :returns: the ID, revision and key of the updated document
         :rtype: dict
-        :raises: VertexRevisionError, VertexUpdateError
+        :raises: KeyError, DocumentRevisionError, DocumentUpdateError
         """
+        _validate_document(document)
+
         params = {'keepNull': keep_none}
         if sync is not None:
             params['waitForSync'] = sync
-        if rev is not None:
-            params['rev'] = rev
-        elif '_rev' in data:
-            params['rev'] = data['_rev']
+
+        headers = {}
+        if '_rev' in document:
+            headers['If-Match'] = document['_rev']
 
         request = Request(
             method='patch',
             endpoint='/_api/gharial/{}/vertex/{}/{}'.format(
-                self._graph, self._name, key
+                self._graph, self._name, document['_key']
             ),
-            data=data,
-            params=params
+            data=document,
+            params=params,
+            headers=headers
         )
 
         def handler(res):
             if res.status_code == 412:
-                raise VertexRevisionError(res)
+                raise DocumentRevisionError(res)
             elif res.status_code not in HTTP_OK:
-                raise VertexUpdateError(res)
+                raise DocumentUpdateError(res)
             vertex = res.body['vertex']
             vertex['_old_rev'] = vertex.pop('_oldRev')
             return vertex
 
         return request, handler
 
-    def replace_one(self, key, data, rev=None, sync=False):
-        """Replace the specified vertex in the graph.
+    def replace_one(self, document, sync=None):
+        """Replace a document by its key in the vertex collection.
 
-        If ``data`` contains the ``_key`` field, the field is ignored.
+        The "_key" field must be present in ``document``.
 
-        If ``data`` contains the ``_rev`` field, or if ``revision`` is given,
-        the revision of the target vertex must match against its value.
-        Otherwise, VertexRevisionError is raised.
+        If the "_rev" field is present in ``document``, its value is compared
+        against the revision of the target document. DocumentRevisionError is
+        raised if the revisions do not match.
 
-        :param key: the vertex key
-        :type key: str
-        :param data: the body to replace the vertex with
-        :type data: dict
-        :param rev: the vertex revision
-        :type rev: str | None
+        :param document: the new document
+        :type document: dict
         :param sync: wait for operation to sync to disk
-        :type sync: bool
-        :returns: the ID, revision and key of the replaced vertex
+        :type sync: bool | None
+        :returns: the ID, revision and key of the replaced document
         :rtype: dict
-        :raises: VertexRevisionError, VertexReplaceError
+        :raises: KeyError, DocumentRevisionError, DocumentReplaceError
         """
+        _validate_document(document)
+
         params = {}
         if sync is not None:
             params['waitForSync'] = sync
-        if rev is not None:
-            params['rev'] = rev
-        elif '_rev' in data:
-            params['rev'] = data['_rev']
+
+        headers = {}
+        if '_rev' in document:
+            headers['If-Match'] = document['_rev']
 
         request = Request(
             method='put',
             endpoint='/_api/gharial/{}/vertex/{}/{}'.format(
-                self._graph, self._name, key
+                self._graph, self._name, document['_key']
             ),
             params=params,
-            data=data
+            data=document,
+            headers=headers
         )
 
         def handler(res):
             if res.status_code == 412:
-                raise VertexRevisionError(res)
+                raise DocumentRevisionError(res)
             elif res.status_code not in HTTP_OK:
-                raise VertexReplaceError(res)
+                raise DocumentReplaceError(res)
             vertex = res.body['vertex']
             vertex['_old_rev'] = vertex.pop('_oldRev')
             return vertex
 
         return request, handler
 
-    def delete_one(self, key, rev=None, sync=False, ignore_missing=True):
-        """Delete the vertex of the specified ID from the graph.
+    def delete_one(self, document, ignore_missing=True, sync=None):
+        """Delete a document by its key from the vertex collection.
 
-        :param key: the vertex key
-        :type key: str
-        :param rev: the vertex revision must match the value
-        :type rev: str | None
-        :param sync: wait for the create to sync to disk
-        :type sync: bool
-        :param ignore_missing: ignore missing vertex
+        The "_key" field must be present in ``document``.
+
+        If the "_rev" field is present in ``document``, its value is compared
+        against the revision of the target document. DocumentRevisionError is
+        raised if the revisions do not match.
+
+        :param document: the document to delete
+        :type document: dict
+        :param sync: wait for the operation to sync to disk
+        :type sync: bool | None
+        :param ignore_missing: ignore missing documents
         :type ignore_missing: bool
-        :returns: the ID, revision and key of the deleted vertex
-        :rtype: dict
-        :raises: VertexRevisionError, VertexDeleteError
+        :returns: whether the document was deleted successfully
+        :rtype: bool
+        :raises: KeyError, DocumentRevisionError, DocumentDeleteError
         """
-        params = {"waitForSync": sync}
-        if rev is not None:
-            params["rev"] = rev
+        _validate_document(document)
+
+        params = {}
+        if sync is not None:
+            params['waitForSync'] = sync
+
+        headers = {}
+        if '_rev' in document:
+            headers['If-Match'] = document['_rev']
 
         request = Request(
             method='delete',
             endpoint='/_api/gharial/{}/vertex/{}/{}'.format(
-                self._graph, self._name, key
+                self._graph, self._name, document['_key']
             ),
-            params=params
+            params=params,
+            headers=headers
         )
 
         def handler(res):
             if res.status_code == 412:
-                raise VertexRevisionError(res)
+                raise DocumentRevisionError(res)
             elif res.status_code == 404:
                 if ignore_missing:
                     return False
-                else:
-                    raise VertexDeleteError(res)
+                raise DocumentDeleteError(res)
             if res.status_code not in HTTP_OK:
-                raise VertexDeleteError(res)
+                raise DocumentDeleteError(res)
             return res.body['removed']
 
         return request, handler
 
 
 class EdgeCollection(BaseCollection):
+    """ArangoDB edge collection.
 
-    _bypass_methods = {'name', 'graph'}
+    An edge collection consists of edge documents. It is uniquely identified
+    by its name, which must consist only of alphanumeric characters, hyphen
+    and the underscore characters. Edge collections share their namespace with
+    other types of collections.
+
+    The documents in an edge collection are fully accessible from a standard
+    collection. However, accessing documents through an edge collection gives
+    the following guarantees:
+
+    * All modifications are executed in transactions
+    * An edge document is checked against the edge definitions on insert
+
+    :param connection: ArangoDB database connection object
+    :type connection: arango.connection.Connection
+    :param graph: the name of the graph
+    :type graph: str
+    :param name: the name of the edge collection
+    :type name: str
+    """
+
+    _standard_methods = {'name', 'graph_name'}
 
     def __init__(self, connection, graph, name):
         super(EdgeCollection, self).__init__(connection, name)
@@ -1746,16 +1808,7 @@ class EdgeCollection(BaseCollection):
         )
 
     @property
-    def name(self):
-        """Return the name of the collection.
-
-        :returns: the name of the collection
-        :rtype: str
-        """
-        return self._name
-
-    @property
-    def graph(self):
+    def graph_name(self):
         """Return the name of the graph.
 
         :returns: the name of the graph
@@ -1763,22 +1816,61 @@ class EdgeCollection(BaseCollection):
         """
         return self._graph
 
-    def insert(self, document, sync=False):
+    def fetch_by_key(self, key, rev=None):
+        """Fetch a document by key from the edge collection.
+
+        If ``rev`` is given, its value is compared against the revision of the
+        target document. DocumentRevisionError is raised if the revisions do
+        not match.
+
+        :param key: the document key
+        :type key: str
+        :param rev: the document revision
+        :type rev: str | None
+        :returns: the vertex document or None if not found
+        :rtype: dict | None
+        :raises: DocumentRevisionError, DocumentFetchError
+        """
+        request = Request(
+            method='get',
+            endpoint='/_api/gharial/{}/edge/{}/{}'.format(
+                self._graph, self._name, key
+            ),
+            headers={'If-Match': rev} if rev else {}
+        )
+
+        def handler(res):
+            if res.status_code == 412:
+                raise DocumentRevisionError(res)
+            elif res.status_code == 404:
+                return None
+            elif res.status_code not in HTTP_OK:
+                raise DocumentFetchError(res)
+            return res.body["edge"]
+
+        return request, handler
+
+    def insert_one(self, document, sync=None):
         """Insert a new document into the edge collection.
 
-        The ``document`` must contain the "_from" and "_to" keys.
+        If the "_key" field is present in ``document``, its value is used as
+        the key of the new document. Otherwise, the key is auto-generated.
+
+        The ``document`` must contain the keys "_from" and "_to".
 
         :param document: the document body
         :type document: dict
         :param sync: wait for the operation to sync to disk
-        :type sync: bool
+        :type sync: bool | None
         :returns: the id, rev and key of the target document
         :rtype: dict
         :raises: KeyError, DocumentInsertError
         """
-        for key in ['_from', '_to']:
-            if key not in document:
-                raise KeyError('The document is missing "{}"'.format(key))
+        _validate_document(document, required=['_from', '_to'])
+
+        params = {}
+        if sync is not None:
+            params['waitForSync'] = sync
 
         request = Request(
             method='post',
@@ -1786,7 +1878,7 @@ class EdgeCollection(BaseCollection):
                 self._graph, self._name
             ),
             data=document,
-            params={"waitForSync": sync}
+            params=params
         )
 
         def handler(res):
@@ -1796,72 +1888,36 @@ class EdgeCollection(BaseCollection):
 
         return request, handler
 
-    def fetch_one(self, filters):
-        """Fetch a document from the collection.
+    def update_one(self, document, keep_none=True, sync=None):
+        """Update a document by its key in the edge collection.
 
-        :param filters:
-        :type filters: str
-        :returns: the requested edge | None if not found
-        :rtype: dict | None
-        :raises: EdgeRevisionError, EdgeGetError
-        """
-        if '_key' not in filters:
-            raise KeyError('The document filter is missing "_key"')
+        The "_key" field must be present in ``document``.
 
-        headers, params = {}, {}
-        if '_rev' in filters:
-            headers['If-Match'] = filters['_rev']
+        If the "_rev" field is present in ``document``, its value is compared
+        against the revision of the target document. DocumentRevisionError is
+        raised if the revisions do not match.
 
-        request = Request(
-            method='get',
-            endpoint='/_api/gharial/{}/edge/{}/{}'.format(
-                self._graph, self._name, filters['_key']
-            ),
-            params=params,
-            headers=headers
-        )
+        If ``keep_none`` is set to True, the fields whose value is None are
+        retained in the document. Otherwise, the fields are removed from the
+        document completely.
 
-        def handler(res):
-            if res.status_code == 412:
-                raise EdgeRevisionError(res)
-            elif res.status_code == 404:
-                return None
-            elif res.status_code not in HTTP_OK:
-                raise EdgeGetError(res)
-            return res.body["edge"]
-
-        return request, handler
-
-    def update_one(self, document, keep_none=True, sync=False):
-        """Update an edge in the edge collection.
-
-        If ``keep_none`` is set to True, then key with values None are
-        retained in the edge. Otherwise, they are removed from the edge.
-
-        If ``data`` contains the ``_key`` key, it is ignored.
-
-        If the ``_rev`` key is in ``data``, the revision of the target
-        edge must match against its value. Otherwise a EdgeRevision
-        error is thrown. If ``rev`` is also provided, its value is preferred.
-
-        :param document: the document body
+        :param document: the partial/full document with the updated values
         :type document: dict
-        :param keep_none: whether to retain the keys with value None
+        :param keep_none: keep fields with value None
         :type keep_none: bool
         :param sync: wait for the operation to sync to disk
-        :type sync: bool
+        :type sync: bool | None
         :returns: the id, rev and key of the target document
         :rtype: dict
-        :raises: DocumentRevisionError, DocumentUpdateError
+        :raises: KeyError, DocumentRevisionError, DocumentUpdateError
         """
-        if '_key' not in document:
-            raise KeyError('The document is missing "_key"')
+        _validate_document(document)
 
-        headers, params = {}, {}
+        params = {'keepNull': keep_none}
         if sync is not None:
             params['waitForSync'] = sync
-        if keep_none is not None:
-            params['keepNull'] = keep_none
+
+        headers = {}
         if '_rev' in document:
             headers['If-Match'] = document['_rev']
 
@@ -1880,23 +1936,25 @@ class EdgeCollection(BaseCollection):
                 raise DocumentRevisionError(res)
             elif res.status_code not in HTTP_OK:
                 raise DocumentUpdateError(res)
-            return res.body["edge"]
+            edge = res.body["edge"]
+            edge['_old_rev'] = edge.pop('_oldRev')
+            return edge
 
         return request, handler
 
     def replace_one(self, document, sync=None):
-        """Replace a document in the collection.
+        """Replace a document by its key in the edge collection.
 
-        The ``document`` must contain the keys "_key", "_from" and "_to".
+        The "_key", "_from" and "_to" fields must be present in ``document``.
 
-        If the ``document`` contains the key "_rev", its value is compared
-        with the revision of the target document. If the revisions do not
-        match, DocumentRevisionError is raised.
+        If the "_rev" field is present in ``document``, its value is compared
+        against the revision of the target document. DocumentRevisionError is
+        raised if the revisions do not match.
 
-        :param document: the document body
+        :param document: the new document
         :type document: dict
         :param sync: wait for the operation to sync to disk
-        :type sync: bool
+        :type sync: bool | None
         :returns: the id, rev and key of the target document
         :rtype: dict
         :raises: KeyError, DocumentRevisionError, DocumentReplaceError
@@ -1930,31 +1988,32 @@ class EdgeCollection(BaseCollection):
 
         return request, handler
 
-    def delete_one(self, document, sync=None, ignore_missing=False):
+    def delete_one(self, document, ignore_missing=False, sync=None):
         """Delete a document from the collection by its key.
 
-        The ``document`` must contain "_key".
+        The "_key" field must be present in ``document``.
 
-        If the ``ignore_missing`` flag is set to True, the method simply
-        returns when the target document is not found. If the flag is set
-        to True, DocumentDeleteError is raised instead.
+        If the "_rev" field is present in ``document``, its value is compared
+        against the revision of the target document. DocumentRevisionError is
+        raised if the revisions do not match.
 
-        :param document: the body of the document
+        :param document: the document to delete
         :type document: dict
         :param sync: wait for the operation to sync to disk
-        :type sync: bool
-        :param ignore_missing: do not raise an error if document is missing
+        :type sync: bool | None
+        :param ignore_missing: ignore missing documents
         :type ignore_missing: bool
-        :returns: the id, rev and key of the document
-        :rtype: dict
+        :returns: whether the document was deleted successfully
+        :rtype: bool
         :raises: KeyError, DocumentRevisionError, DocumentDeleteError
         """
-        if '_key' not in document:
-            raise KeyError('The document is missing "_key"')
+        _validate_document(document)
 
-        headers, params = {}, {}
+        params = {}
         if sync is not None:
             params['waitForSync'] = sync
+
+        headers = {}
         if '_rev' in document:
             headers['If-Match'] = document['_rev']
 
@@ -1972,28 +2031,25 @@ class EdgeCollection(BaseCollection):
                 raise DocumentRevisionError(res)
             elif res.status_code == 404:
                 if ignore_missing:
-                    return
+                    return False
                 raise DocumentDeleteError(res)
             elif res.status_code not in HTTP_OK:
                 raise DocumentDeleteError(res)
-            return res.body
+            return res.body['removed']
 
         return request, handler
 
 
-def _validate_document(document, required_fields=None):
-    """Check if ``document`` contains the fields in ``required_fields``.
+def _validate_document(document, required=None):
+    """Check if ``document`` contains the fields in ``required``.
 
     :param document: the document body
     :type document: dict
-    :param required_fields: list of required field names
-    :type required_fields: list
+    :param required: list of required field names
+    :type required: list
     :raises: KeyError
     """
-    required_fields = required_fields if required_fields else ['_key']
-    missing_fields = [f for f in required_fields if f not in document]
-    if missing_fields:
-        raise KeyError(
-            'The document is missing required fields {}'
-            .format(missing_fields)
-        )
+    required = required if required else ['_key']
+    missing = [f for f in required if f not in document]
+    if missing:
+        raise KeyError('The document is missing fields {}'.format(missing))

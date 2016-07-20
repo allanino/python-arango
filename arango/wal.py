@@ -121,7 +121,7 @@ class WriteAheadLog(object):
         """Flush the write-ahead log to collection journals and data files.
 
         :param sync: block until data is synced to disk
-        :type sync: bool
+        :type sync: bool | None
         :param garbage_collect: block until flushed data is garbage collected
         :type garbage_collect: bool
         :returns: whether the write-ahead log was flushed successfully

@@ -9,13 +9,13 @@ class APIWrapper(object):
     This class is meant to be used internally only.
     """
 
-    _normal_methods = {'name'}
+    _standard_methods = {'name'}
 
     def __getattribute__(self, attr):
         method = object.__getattribute__(self, attr)
-        internal = object.__getattribute__(self, '_normal_methods')
+        standard = object.__getattribute__(self, '_standard_methods')
 
-        if attr in internal or attr.startswith('_') or attr.isupper():
+        if attr in standard or attr.startswith('_') or attr.isupper():
             return method
         conn = object.__getattribute__(self, '_conn')
 

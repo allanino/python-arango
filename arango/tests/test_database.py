@@ -40,7 +40,7 @@ def test_properties():
 
 @pytest.mark.order2
 def test_list_collections():
-    cols = db.list_collections()
+    cols = db.collections()
     assert all(c == col_name_1 or c.startswith('_') for c in cols)
 
 
@@ -96,7 +96,7 @@ def test_drop_collection():
     # Test drop collection
     result = db.delete_collection(col_name_2)
     assert result is True
-    assert col_name_2 not in db.list_collections()
+    assert col_name_2 not in db.collections()
 
     # Test drop missing collection
     with pytest.raises(CollectionDeleteError):
