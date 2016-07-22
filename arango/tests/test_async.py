@@ -35,5 +35,8 @@ def test_async_insert():
     job1 = db.c(col_name).insert_one({'_key': '1', 'val': 1})
     job2 = db.c(col_name).insert_one({'_key': '2', 'val': 2})
     job3 = db.c(col_name).insert_one({'_key': '3', 'val': 3})
-    assert len(col) == 3
 
+    assert len(col) == 3
+    assert job1.result()['_key'] == '1'
+    assert job2.result()['_key'] == '2'
+    assert job3.result()['_key'] == '3'

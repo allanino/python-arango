@@ -140,7 +140,7 @@ class Query(object):
         if res.status_code not in HTTP_OK:
             raise AQLFunctionListError(res)
         body = res.body or {}
-        return {func['name']: func['code'] for func in body}
+        return {func['name']: func['code'] for func in map(dict, body)}
 
     def create_function(self, name, code):
         """Create a new AQL function.

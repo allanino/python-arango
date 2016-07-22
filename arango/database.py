@@ -121,7 +121,7 @@ class Database(object):
                 'type': Collection.TYPES[col['type']],
                 'status': Collection.STATUSES[col['status']],
             }
-            for col in res.body['result']
+            for col in map(dict, res.body['result'])
         }
 
     def collection(self, name):
@@ -241,7 +241,7 @@ class Database(object):
                 'revision': graph['_rev'],
                 'edge_definitions': graph['edgeDefinitions'],
                 'orphan_collections': graph['orphanCollections']
-            } for graph in res.body['graphs']
+            } for graph in map(dict, res.body['graphs'])
         ]
 
     def graph(self, name):

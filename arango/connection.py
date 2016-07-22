@@ -57,7 +57,7 @@ class Connection(object):
         self._logging = enable_logging
 
     def __repr__(self):
-        return '<ArangoDB connection to "{}">'.format(self.url_prefix)
+        return '<ArangoDB connection to "{}">'.format(self._url_prefix)
 
     @property
     def protocol(self):

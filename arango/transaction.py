@@ -10,8 +10,9 @@ class Transaction(object):
     :type connection: arango.connection.Connection
     """
 
-    def __init__(self, connection):
+    def __init__(self, connection, return_result=True):
         self._conn = connection
+        self._return_result = return_result
 
 
 

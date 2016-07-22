@@ -651,4 +651,3 @@ class AsyncJobResultGetError(ArangoError):
 
 class AsyncJobResultDeleteError(ArangoError):
     """Failed to delete the asynchronous result from the server."""
-

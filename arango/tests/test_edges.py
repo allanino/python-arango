@@ -64,8 +64,8 @@ def test_properties():
     assert 'id' in properties
     assert properties['status'] in Collection.STATUSES.values()
     assert properties['name'] == ecol_name
-    assert properties['edge'] == True
-    assert properties['system'] == False
+    assert properties['edge'] is True
+    assert properties['system'] is False
     assert isinstance(properties['sync'], bool)
     assert isinstance(properties['compact'], bool)
     assert isinstance(properties['volatile'], bool)
@@ -529,7 +529,7 @@ def test_fetch():
 
     found = list(ecol.fetch({'value': 100}))
     assert len(found) == 2
-    for edge in found:
+    for edge in map(dict, found):
         assert edge['_key'] in ['1', '2']
         assert {
             '_key': edge['_key'],
@@ -540,7 +540,7 @@ def test_fetch():
 
     found = list(ecol.fetch({'value': 100}, offset=1))
     assert len(found) == 1
-    for edge in found:
+    for edge in map(dict, found):
         assert edge['_key'] == '2'
         assert {
             '_key': edge['_key'],
@@ -551,7 +551,7 @@ def test_fetch():
 
     found = list(ecol.fetch({}, limit=4))
     assert len(found) == 4
-    for edge in found:
+    for edge in map(dict, found):
         assert edge['_key'] in ['1', '2', '3', '4']
         assert {
             '_key': edge['_key'],
@@ -604,7 +604,7 @@ def test_fetch_all():
     #     ecol.insert(doc)
     fetched = list(ecol.fetch_all())
     assert len(fetched) == len(inserted)
-    for edge in fetched:
+    for edge in map(dict, fetched):
         assert {
             '_key': edge['_key'],
             '_from': edge['_from'],

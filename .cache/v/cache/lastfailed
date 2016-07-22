@@ -1,5 +1,3 @@
 {
-  "arango/tests/test_graph.py::test_delete_vertex": true, 
-  "arango/tests/test_graph.py::test_replace_vertex": true, 
-  "arango/tests/test_graph.py::test_update_vertex": true
+  "arango/tests/test_graph.py::test_replace_edge": true
 }

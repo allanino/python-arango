@@ -448,13 +448,14 @@ class ArangoClient(object):
         res = self._conn.get('/_api/user')
         if res.status_code not in HTTP_OK:
             raise UserListError(res)
+
         return {
             record['user']: {
                 'user': record['user'],
                 'active': record['active'],
                 'extra': record['extra'],
                 'change_password': record['changePassword']
-            } for record in res.body['result']
+            } for record in map(dict, res.body['result'])
         }
 
     def user(self, username):
@@ -616,40 +617,40 @@ class ArangoClient(object):
                 raise UserDeleteError(res)
         return not res.body['error']
 
-    def grant_user_access(self, username, database):
+    def grant_user_access(self, username, db_name):
         """Grant user access to the given database.
 
         Permission to ``_system`` database is required for this method.
 
         :param username: the name of the user
         :type username: str
-        :param database: the name of the database
-        :type database: str
+        :param db_name: the name of the database
+        :type db_name: str
         :return: whether the operation was successful
         :rtype: bool
         :raises: UserGrantAccessError
         """
         res = self._conn.put(
-            '/_api/user/{}/database/{}'.format(username, database),
+            '/_api/user/{}/database/{}'.format(username, db_name),
             data={'grant': 'rw'}
         )
         if res.status_code not in HTTP_OK:
             raise UserGrantAccessError(res)
         return not res.body.get('error')
 
-    def revoke_user_access(self, username, database):
+    def revoke_user_access(self, username, db_name):
         """Revoke user access to the given database.
 
         Permission to ``_system`` database is required for this method.
 
         :param username: the name of the user
         :type username: str
-        :param database: the name of the database
-        :type database: str
+        :param db_name: the name of the database
+        :type db_name: str
         :return: whether the operation was successful
         """
         res = self._conn.put(
-            '/_api/user/{}/database/{}'.format(username, database),
+            '/_api/user/{}/database/{}'.format(username, db_name),
             data={'grant': 'none'}
         )
         if res.status_code not in HTTP_OK:
@@ -670,7 +671,7 @@ class ArangoClient(object):
         res = self._conn.get('/_api/tasks')
         if res.status_code not in HTTP_OK:
             raise TasksListError(res)
-        return {record['id']: record for record in res.body}
+        return {record['id']: record for record in map(dict, res.body)}
 
     def task(self, task_id):
         """Return the active server task with the given id.

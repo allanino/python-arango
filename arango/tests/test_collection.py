@@ -35,8 +35,8 @@ def test_properties():
     assert 'id' in properties
     assert properties['status'] in Collection.STATUSES.values()
     assert properties['name'] == col_name
-    assert properties['edge'] == False
-    assert properties['system'] == False
+    assert properties['edge'] is False
+    assert properties['system'] is False
     assert isinstance(properties['sync'], bool)
     assert isinstance(properties['compact'], bool)
     assert isinstance(properties['volatile'], bool)
@@ -247,33 +247,41 @@ def test_update_one():
     assert doc['_key'] == '1'
     assert doc['_rev'].isdigit()
     assert col['1']['value'] == 200
+    old_rev = doc['_rev']
 
     doc['value'] = None
     doc = col.update_one(doc, keep_none=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert doc['_rev'].isdigit()
+    assert doc['_old_rev'] == old_rev
     assert col['1']['value'] is None
+    old_rev = doc['_rev']
 
     doc['value'] = {'bar': 1}
     doc = col.update_one(doc, sync=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert doc['_rev'].isdigit()
+    assert doc['_old_rev'] == old_rev
     assert col['1']['value'] == {'bar': 1}
+    old_rev = doc['_rev']
 
     doc['value'] = {'baz': 2}
     doc = col.update_one(doc, merge=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert doc['_rev'].isdigit()
+    assert doc['_old_rev'] == old_rev
     assert col['1']['value'] == {'bar': 1, 'baz': 2}
+    old_rev = doc['_rev']
 
     doc['value'] = None
     doc = col.update_one(doc, keep_none=False)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert doc['_rev'].isdigit()
+    assert doc['_old_rev'] == old_rev
     assert 'value' not in col['1']
 
     doc['value'] = 300
@@ -320,13 +328,16 @@ def test_replace_one():
     assert doc['_key'] == '1'
     assert doc['_rev'].isdigit()
     assert col['1']['value'] == 200
+    old_rev = doc['_rev']
 
     doc['value'] = 300
     doc = col.replace_one(doc, sync=True)
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert doc['_rev'].isdigit()
+    assert doc['_old_rev'] == old_rev
     assert col['1']['value'] == 300
+    old_rev = doc['_rev']
 
     doc['value'] = 400
     del doc['_rev']
@@ -334,6 +345,7 @@ def test_replace_one():
     assert doc['_id'] == '{}/1'.format(col.name)
     assert doc['_key'] == '1'
     assert doc['_rev'].isdigit()
+    assert doc['_old_rev'] == old_rev
     assert col['1']['value'] == 400
 
     doc['value'] = 500
@@ -385,6 +397,7 @@ def test_delete_one():
     assert result['_id'] == '{}/1'.format(col.name)
     assert result['_key'] == '1'
     assert result['_rev'].isdigit()
+    assert '_old_rev' not in result
     assert '1' not in col
     assert len(col) == 2
 
@@ -392,6 +405,7 @@ def test_delete_one():
     assert result['_id'] == '{}/2'.format(col.name)
     assert result['_key'] == '2'
     assert result['_rev'].isdigit()
+    assert '_old_rev' not in result
     assert '2' not in col
     assert len(col) == 1
 
@@ -454,19 +468,19 @@ def test_fetch():
 
     found = list(col.fetch({'value': 100}))
     assert len(found) == 3
-    for doc in found:
+    for doc in map(dict, found):
         assert doc['_key'] in ['1', '2', '3']
         assert {'_key': doc['_key'], 'value': doc['value']} in inserted
 
     found = list(col.fetch({'value': 100}, offset=1))
     assert len(found) == 2
-    for doc in found:
+    for doc in map(dict, found):
         assert doc['_key'] in ['1', '2', '3']
         assert {'_key': doc['_key'], 'value': doc['value']} in inserted
 
     found = list(col.fetch({}, limit=4))
     assert len(found) == 4
-    for doc in found:
+    for doc in map(dict, found):
         assert doc['_key'] in ['1', '2', '3', '4', '5']
         assert {'_key': doc['_key'], 'value': doc['value']} in inserted
 
@@ -524,7 +538,7 @@ def test_fetch_all():
         col.insert_one(doc)
     fetched = list(col.fetch_all())
     assert len(fetched) == len(inserted)
-    for doc in fetched:
+    for doc in map(dict, fetched):
         assert {'_key': doc['_key'], 'value': doc['value']} in inserted
 
     # TODO ordering is strange

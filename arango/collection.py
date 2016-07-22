@@ -538,21 +538,26 @@ class BaseCollection(APIWrapper):
         request = Request(
             method='put',
             endpoint='/_api/simple/by-example',
-            data={'collection': self._name, 'limit': 2, 'offset': 0}
+            data={
+                'collection': self._name,
+                'example': filters,
+                'limit': 2,
+                'offset': 0
+            }
         )
 
         def handler(res):
             if res.status_code not in HTTP_OK:
-                raise DocumentFetchError('Found more than one result')
+                raise DocumentFetchError('Found more than one document')
             with Cursor(self._conn, res.body) as cursor:
                 try:
-                    first = cursor.next()
+                    document = cursor.next()
                 except StopIteration:
-                    return
+                    return None
                 try:
                     cursor.next()
                 except StopIteration:
-                    return first
+                    return document
                 else:
                     raise DocumentFetchError('Found more than one document')
 
@@ -564,7 +569,7 @@ class BaseCollection(APIWrapper):
         :param keys: the list of document keys
         :type keys: list
         :returns: the list of documents
-        :rtype: list
+        :rtype: [dict]
         :raises: DocumentFetchError
         """
         request = Request(
@@ -1250,8 +1255,9 @@ class Collection(BaseCollection):
             params['waitForSync'] = sync
 
         headers = {}
-        if '_rev' in document:
-            headers['If-Match'] = document['_rev']
+        revision = document.get('_rev')
+        if revision is not None:
+            headers['If-Match'] = revision
 
         request = Request(
             method='patch',
@@ -1268,6 +1274,7 @@ class Collection(BaseCollection):
                 raise DocumentRevisionError(res)
             if res.status_code not in HTTP_OK:
                 raise DocumentUpdateError(res)
+            res.body['_old_rev'] = res.body.pop('_oldRev')
             return res.body
 
         return request, handler
@@ -1335,8 +1342,9 @@ class Collection(BaseCollection):
             params['waitForSync'] = sync
 
         headers = {}
-        if '_rev' in document:
-            headers['If-Match'] = document['_rev']
+        revision = document.get('_rev')
+        if revision is not None:
+            headers['If-Match'] = revision
 
         request = Request(
             method='put',
@@ -1353,6 +1361,7 @@ class Collection(BaseCollection):
                 raise DocumentRevisionError(res)
             elif res.status_code not in HTTP_OK:
                 raise DocumentReplaceError(res)
+            res.body['_old_rev'] = res.body.pop('_oldRev')
             return res.body
 
         return request, handler
@@ -1404,8 +1413,8 @@ class Collection(BaseCollection):
         :type sync: bool | None
         :param ignore_missing: ignore missing documents
         :type ignore_missing: bool
-        :returns: whether the document was deleted successfully
-        :rtype: bool
+        :returns: the ID, revision and key of the replaced document
+        :rtype: dict
         :raises: DocumentRevisionError, DocumentDeleteError
         """
         _validate_document(document)
@@ -1415,8 +1424,9 @@ class Collection(BaseCollection):
             params['waitForSync'] = sync
 
         headers = {}
-        if '_rev' in document:
-            headers['If-Match'] = document['_rev']
+        revision = document.get('_rev')
+        if revision is not None:
+            headers['If-Match'] = revision
 
         request = Request(
             method='delete',
@@ -1446,10 +1456,10 @@ class Collection(BaseCollection):
         The "_key" field must be present in each document in ``documents``.
 
         :param documents: list of documents to delete
-        :type documents: list
+        :type documents: [dict]
         :param sync: wait for the operation to sync to disk
         :type sync: bool | None
-        :returns: the number of documents deleted
+        :returns: the number of documents deleted and ignored
         :rtype: dict
         :raises: DocumentDeleteError
         """
@@ -1474,7 +1484,10 @@ class Collection(BaseCollection):
         def handler(res):
             if res.status_code not in HTTP_OK:
                 raise DocumentDeleteError(res)
-            return res.body
+            return {
+                'ignored': res.body['ignored'],
+                'removed': res.body['removed']
+            }
 
         return request, handler
 
@@ -1485,7 +1498,7 @@ class Collection(BaseCollection):
         :type keys: list
         :param sync: wait for the operation to sync to disk
         :type sync: bool | None
-        :returns: the number of documents deleted
+        :returns: the number of documents deleted and ignored
         :rtype: dict
         :raises: DocumentDeleteError
         """
@@ -1502,7 +1515,10 @@ class Collection(BaseCollection):
         def handler(res):
             if res.status_code not in HTTP_OK:
                 raise DocumentDeleteError(res)
-            return res.body
+            return {
+                'ignored': res.body['ignored'],
+                'removed': res.body['removed']
+            }
 
         return request, handler
 
@@ -1649,8 +1665,9 @@ class VertexCollection(BaseCollection):
             params['waitForSync'] = sync
 
         headers = {}
-        if '_rev' in document:
-            headers['If-Match'] = document['_rev']
+        revision = document.get('_rev')
+        if revision is not None:
+            headers['If-Match'] = revision
 
         request = Request(
             method='patch',
@@ -1697,8 +1714,9 @@ class VertexCollection(BaseCollection):
             params['waitForSync'] = sync
 
         headers = {}
-        if '_rev' in document:
-            headers['If-Match'] = document['_rev']
+        revision = document.get('_rev')
+        if revision is not None:
+            headers['If-Match'] = revision
 
         request = Request(
             method='put',
@@ -1747,8 +1765,9 @@ class VertexCollection(BaseCollection):
             params['waitForSync'] = sync
 
         headers = {}
-        if '_rev' in document:
-            headers['If-Match'] = document['_rev']
+        revision = document.get('_rev')
+        if revision is not None:
+            headers['If-Match'] = revision
 
         request = Request(
             method='delete',
@@ -1918,8 +1937,9 @@ class EdgeCollection(BaseCollection):
             params['waitForSync'] = sync
 
         headers = {}
-        if '_rev' in document:
-            headers['If-Match'] = document['_rev']
+        revision = document.get('_rev')
+        if revision is not None:
+            headers['If-Match'] = revision
 
         request = Request(
             method='patch',
@@ -1959,15 +1979,15 @@ class EdgeCollection(BaseCollection):
         :rtype: dict
         :raises: KeyError, DocumentRevisionError, DocumentReplaceError
         """
-        for key in ['_key', '_from', '_to']:
-            if key not in document:
-                raise KeyError('The document is missing "{}"'.format(key))
+        _validate_document(document)
 
         headers, params = {}, {}
         if sync is not None:
             params['waitForSync'] = sync
-        if '_rev' in document:
-            headers['If-Match'] = document['_rev']
+
+        revision = document.get('_rev')
+        if revision is not None:
+            headers['If-Match'] = revision
 
         request = Request(
             method='put',
@@ -1984,7 +2004,9 @@ class EdgeCollection(BaseCollection):
                 raise DocumentRevisionError(res)
             elif res.status_code not in HTTP_OK:
                 raise DocumentReplaceError(res)
-            return res.body["edge"]
+            edge = res.body["edge"]
+            edge['_old_rev'] = edge.pop('_oldRev')
+            return edge
 
         return request, handler
 
@@ -2014,8 +2036,9 @@ class EdgeCollection(BaseCollection):
             params['waitForSync'] = sync
 
         headers = {}
-        if '_rev' in document:
-            headers['If-Match'] = document['_rev']
+        revision = document.get('_rev')
+        if revision is not None:
+            headers['If-Match'] = revision
 
         request = Request(
             method='delete',

@@ -34,7 +34,7 @@ def test_properties():
     properties = db.properties()
     assert 'id' in properties
     assert 'path' in properties
-    assert properties['system'] == False
+    assert properties['system'] is False
     assert properties['name'] == db_name
 
 
@@ -79,14 +79,14 @@ def test_create_collection():
     properties = col.properties()
     assert 'id' in properties
     assert properties['name'] == col_name_2
-    assert properties['sync'] == True
-    assert properties['compact'] == False
+    assert properties['sync'] is True
+    assert properties['compact'] is False
     assert properties['journal_size'] == 7774208
-    assert properties['system'] == False
-    assert properties['volatile'] == False
-    assert properties['edge'] == True
+    assert properties['system'] is False
+    assert properties['volatile'] is False
+    assert properties['edge'] is True
     assert properties['keygen'] == 'autoincrement'
-    assert properties['user_keys'] == False
+    assert properties['user_keys'] is False
     assert properties['key_increment'] == 9
     assert properties['key_offset'] == 100
 

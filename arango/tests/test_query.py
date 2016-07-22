@@ -168,5 +168,5 @@ def test_set_query_cache_properties():
 
 @pytest.mark.order8
 def test_clear_query_cache():
-    result = db.query.cache.delete()
+    result = db.query.cache.clear()
     assert isinstance(result, bool)
