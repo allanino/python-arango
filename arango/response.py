@@ -6,7 +6,7 @@ import json
 class Response(object):
     """ArangoDB HTTP response class.
 
-    The clients in arango.clients must return an instance of this class.
+    The clients in arango.http_clients must return an instance of this class.
 
     :param method: the HTTP method
     :type method: str

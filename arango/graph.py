@@ -293,66 +293,115 @@ class Graph(APIWrapper):
     # Graph Traversals #
     ####################
 
-    def traverse(self, start, direction=None, strategy=None, order=None,
-                 item_order=None, uniqueness=None, max_iterations=None,
-                 min_depth=None, max_depth=None, init=None, filters=None,
-                 visitor=None, expander=None, sort=None):
-        """Execute a graph traversal and return the visited vertices.
+    def traverse(self,
+                 vertex_collection,
+                 vertex_key,
+                 direction=None,
+                 strategy=None,
+                 order=None,
+                 item_order=None,
+                 edge_uniqueness=None,
+                 vertex_uniqueness=None,
+                 max_iter=None,
+                 min_depth=None,
+                 max_depth=None,
+                 init_func=None,
+                 sort_func=None,
+                 filter_func=None,
+                 visitor_func=None,
+                 expander_func=None):
+        """Traverse the graph and return the visited vertices and edges.
 
-        For more details on ``init``, ``filter``, ``visitor``, ``expander``
-        and ``sort``, refer to the ArangoDB HTTP API documentation.
 
-        :param start: the ID of the start vertex
-        :type start: str
-        :param direction: "outbound" or "inbound" or "any"
+        ``max_iter`` can be set to avoid endless loops in cyclic graphs. When
+        the ``max_iter`` is reached the traversal aborts.
+
+        ``init_func`` is a Java
+
+         must be a JavaScript function (str) with signature:
+        (config, result) -> void, and is used to initialize any values in result argument
+
+        ``sort_func`` must be a JavaScript function with signature:
+        (left, right) -> integer, and must return -1 if left is smaller than
+        right, +1 if left is greater than right, and 0 if left and right are
+        equal.
+
+        and must return
+
+
+        :param vertex_collection: the name of the vertex collection
+        :type: vertex_collection: str
+        :param vertex_key: the vertex document key
+        :type vertex_key: str
+        :param direction: "outbound", "inbound" or "any" (default)
         :type direction: str
-        :param strategy: "depthfirst" or "breadthfirst"
+        :param strategy: "dfs" or "bfs"
         :type strategy: str
-        :param order: "preorder" or "postorder"
+        :param order: "preorder", "postorder" or "preorder-expander"
         :type order: str
         :param item_order: "forward" or "backward"
         :type item_order: str
-        :param uniqueness: uniqueness of vertices and edges visited
-        :type uniqueness: dict
-        :param max_iterations: max number of iterations in each traversal
-        :type max_iterations: int
-        :param min_depth: minimum traversal depth
+        :param vertex_uniqueness: "none", "global" or "path"
+        :type vertex_uniqueness: str
+        :param edge_uniqueness: "none", "global" or "path"
+        :type edge_uniqueness: str
+        :param max_iter: the max number of iterations in each traversal
+        :type max_iter: int
+        :param min_depth: the minimum depth of the nodes to visit
         :type min_depth: int
-        :param max_depth: maximum traversal depth
+        :param max_depth: the maximum depth of the nodes to visit
         :type max_depth: int
-        :param init: custom init function in Javascript
-        :type init: str
-        :param filters: custom filter function in Javascript
-        :type filters: str
-        :param visitor: custom visitor function in Javascript
-        :type visitor: str
-        :param expander: custom expander function in Javascript
-        :type expander: str
-        :param sort: custom sorting function in Javascript
-        :type sort: str
+        :param init_func: custom initialize function (in JavaScript)
+        :type init_func: str
+        :param sort_func: custom sort function (in JavaScript)
+        :type sort_func: str
+        :param filter_func: custom filter function (in JavaScript)
+        :type filter_func: str
+        :param visitor_func: custom visitor function (in JavaScript)
+        :type visitor_func: str
+        :param expander_func: customer expander function (in JavaScript)
+        :type expander_func: str
+
         :returns: the traversal results
         :rtype: dict
-        :raises: GraphTraversalError
+        :raises: GraphTraverseError
         """
+        vertex_id = '{}/{}'.format(vertex_collection, vertex_key)
+
+        if expander_func is None and direction is None:
+            direction = 'any'
+
+        if strategy.lower() == 'dfs':
+            strategy = 'depthfirst'
+        elif strategy.lower() == 'bfs':
+            strategy = 'breadthfirst'
+
+        uniqueness = {}
+        if vertex_uniqueness is not None:
+            uniqueness['vertices'] = vertex_uniqueness
+        if edge_uniqueness is not None:
+            uniqueness['edges'] = edge_uniqueness
+
         data = {
-            "startVertex": start,
+            "startVertex": vertex_id,
             "graphName": self._name,
             "direction": direction,
             "strategy": strategy,
             "order": order,
             "itemOrder": item_order,
-            "uniqueness": uniqueness,
-            "maxIterations": max_iterations,
+            "uniqueness": uniqueness or None,
+            "maxIterations": max_iter,
             "minDepth": min_depth,
             "maxDepth": max_depth,
-            "init": init,
-            "filter": filters,
-            "visitor": visitor,
-            "expander": expander,
-            "sort": sort
+            "init": init_func,
+            "filter": filter_func,
+            "visitor": visitor_func,
+            "sort": sort_func
         }
         data = {k: v for k, v in data.items() if v is not None}
-        res = self._conn.post("/_api/traversal", data=data)
+        res = self._conn.post(
+            "/_api/traversal",
+            data=data)
         if res.status_code not in HTTP_OK:
-            raise GraphTraversalError(res)
+            raise GraphTraverseError(res)
         return res.body["result"]

@@ -6,5 +6,5 @@ before_install:
     - "sh scripts/setup_arangodb.sh"
 install:
     - "pip install ."
-script: nosetests
+script:
 

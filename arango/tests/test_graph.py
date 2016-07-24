@@ -489,12 +489,12 @@ def test_delete_vertex():
     vcol.insert_one(vertex2)
     vcol.insert_one(vertex3)
 
-    # Test vertex delete
+    # Test delete existing vertex
     assert vcol.delete_one(vertex1) is True
     assert vcol['1'] is None
     assert '1' not in vcol
 
-    # Test vertex delete with sync
+    # Test delete existing vertex with sync
     assert vcol.delete_one(vertex3, sync=True) is True
     assert vcol['3'] is None
     assert '3' not in vcol
@@ -764,31 +764,13 @@ def test_replace_edge():
     assert ecol['1']['bar'] == 400
 
     # Test replace edge with sync option
-    edge.update()
-    result = ecol.replace_one({'_key': '1', 'bar': 500}, sync=True)
+    edge['_rev'] = None
+    result = ecol.replace_one(edge, sync=True)
     assert result['_id'] == 'ecol2/1'
     assert result['_key'] == '1'
     assert result['_old_rev'] == old_rev
-    assert ecol['1']['foo'] == 200
+    assert ecol['1']['foo'] == 300
     assert ecol['1']['bar'] == 500
-    old_rev = result['_rev']
-
-    # Test replace edge without keep_none option
-    result = ecol.replace_one({'_key': '1', 'bar': None}, keep_none=True)
-    assert result['_id'] == 'ecol2/1'
-    assert result['_key'] == '1'
-    assert result['_old_rev'] == old_rev
-    assert ecol['1']['foo'] == 200
-    assert ecol['1']['bar'] is None
-    old_rev = result['_rev']
-
-    # Test replace edge with keep_none option
-    result = ecol.replace_one({'_key': '1', 'foo': None}, keep_none=False)
-    assert result['_id'] == 'ecol2/1'
-    assert result['_key'] == '1'
-    assert result['_old_rev'] == old_rev
-    assert 'foo' not in ecol['1']
-    assert ecol['1']['bar'] is None
     old_rev = result['_rev']
 
     # Test replace edge to a valid edge
@@ -820,12 +802,42 @@ def test_replace_edge():
     assert ecol['1']['_rev'] != old_rev
 
 
-
 @pytest.mark.order18
 def test_delete_edge():
     ecol = graph.edge_collection('ecol2')
+    ecol.truncate()
+    for edge in [edge1, edge2, edge4]:
+        ecol.insert_one(edge)
+
+    # Test delete existing edge
+    assert ecol.delete_one(edge1) is True
+    assert ecol['1'] is None
+    assert '1' not in ecol
+
+    # Test delete existing edge with sync
+    assert ecol.delete_one(edge4, sync=True) is True
+    assert ecol['3'] is None
+    assert '3' not in ecol
+
+    # Test delete edge with incorrect revision
+    old_rev = ecol['2']['_rev']
+    edge2['_rev'] = str(int(old_rev) + 10)
+    with pytest.raises(DocumentRevisionError):
+        ecol.delete_one(edge2)
+    assert '2' in ecol
+
+    # Test delete edge from missing collection
+    with pytest.raises(DocumentDeleteError):
+        graph.v('missing').delete_one(edge1, ignore_missing=False)
+
+    # Test delete missing edge
+    with pytest.raises(DocumentDeleteError):
+        ecol.delete_one(edge3, ignore_missing=False)
+
+    # Test delete missing edge while ignoring missing
+    ecol.delete_one(edge3, ignore_missing=True) is None
 
 
 @pytest.mark.order19
 def test_traverse():
-    pass
+    graph.traverse()

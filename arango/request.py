@@ -6,6 +6,10 @@ from six import moves
 
 
 class Request(object):
+    """ArangoDB API request object.
+
+
+    """
 
     __slots__ = ('method', 'endpoint', 'headers', 'params', 'data')
 

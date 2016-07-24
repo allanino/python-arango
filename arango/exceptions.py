@@ -26,6 +26,9 @@ class ArangoError(Exception):
             else:
                 self.error_code = None
 
+            if self.error_code is not None:
+                message = '[{}] {}'.format(self.error_code, message)
+
             # Generate the error message for the exception
             super(ArangoError, self).__init__(message)
             self.message = message
@@ -556,7 +559,7 @@ class GraphGetPropertiesError(ArangoError):
     """Failed to get the graph property."""
 
 
-class GraphTraversalError(ArangoError):
+class GraphTraverseError(ArangoError):
     """Failed to execute the graph traversal."""
 
 

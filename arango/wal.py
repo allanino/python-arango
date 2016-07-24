@@ -47,8 +47,6 @@ class WriteAheadLog(object):
                        throttle_wait=None, throttle_limit=None):
         """Configure the parameters of the write-ahead log.
 
-        Setting ``throttle_when_pending`` to 0 disables the throttling.
-
         :param oversized_ops: execute and store ops bigger than a log file
         :type oversized_ops: bool | None
         :param log_size: the size of each write-ahead log file
@@ -92,7 +90,7 @@ class WriteAheadLog(object):
         }
 
     def transactions(self):
-        """Return the information about the currently running transactions.
+        """Return details on currently running transactions.
 
         Fields in the returned dictionary:
 

@@ -421,6 +421,48 @@ def test_delete_one():
     assert len(col) == 1
 
 
+def test_delete_many():
+    doc1 = {'_key': '1', 'value': 100}
+    doc2 = {'_key': '2', 'value': 200}
+    doc3 = {'_key': '3', 'value': 300}
+    doc4 = {'_key': '4', 'value': 400}
+
+    # Test delete missing documents
+    result = col.delete_many([doc1, doc2, doc3])
+    assert result['removed'] == 0
+    assert result['ignored'] == 3
+
+    # Setup
+    col.insert_many([doc1, doc2, doc3])
+
+    # Test delete nothing
+    result = col.delete_many([])
+    assert result['removed'] == 0
+    assert result['ignored'] == 0
+    for key in ['1', '2', '3']:
+        assert key in col
+
+    # Test delete one existing document
+    result = col.delete_many([doc1])
+    assert result['removed'] == 1
+    assert result['ignored'] == 0
+    assert '1' not in col
+    assert len(col) == 2
+
+    # Test delete one missing document
+    result = col.delete_many([doc4])
+    assert result['removed'] == 0
+    assert result['ignored'] == 1
+    assert '2' in col and '3' in col
+    assert len(col) == 2
+
+    # Test delete mix of missing and existing documents
+    result = col.delete_by_keys([doc1, doc2, doc3])
+    assert result['removed'] == 2
+    assert result['ignored'] == 1
+    assert len(col) == 0
+
+
 def test_delete_by_keys():
     result = col.delete_by_keys(['1', '2', '3'])
     assert result['removed'] == 0
