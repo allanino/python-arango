@@ -56,11 +56,14 @@ client = ArangoClient()
 # List databases
 client.databases()
 
-# Create a new database
+# Create a database
 db = client.create_database('school')
 
 # Retrieve database information
 db.properties()
+
+# Delete a database
+client.delete_database('school')
 ```
 
 Collections
@@ -85,7 +88,7 @@ students.statistics()
 students.checksum()
 students.count()
 
-# Perform actions on the collection
+# Perform actions on a collection
 students.load()
 students.unload()
 students.truncate()
@@ -102,7 +105,6 @@ client = ArangoClient()
 db = client.db('school')
 students = db.collection('students')
 
-# Define some test students (documents)
 lola = {'_key': '1', 'GPA': 3.5, 'first': 'Lola', 'last': 'Martin'}
 abby = {'_key': '2', 'GPA': 3.2, 'first': 'Abby', 'last': 'Page'}
 john = {'_key': '3', 'GPA': 3.6, 'first': 'John', 'last': 'Kim'} 
@@ -121,13 +123,12 @@ print(len(students) > 5)
 # Insert multiple documents in bulk
 students.insert_many([abby, john, emma])
 
-# Fetch matching document(s)
-matching_students = students.fetch({'first': 'John'})
-for student in matching_students:
-    print(student['first'], student['last'])
-
-# Fetch a single matching document
+# Fetch a single document by filters
 students.fetch_one({'first': 'Emma'})
+
+# Fetch documents by filters
+for student in students.fetch({'first': 'John'}):
+    print(student['_key'], student['GPA'])
 
 # Fetch a single document by key
 students.fetch_by_key('5')
@@ -135,14 +136,14 @@ students.fetch_by_key('5')
 # Fetch multiple documents by key
 students.fetch_by_keys(['1', '2'])
 
-# Update all matching document(s)
+# Update documents by filters
 students.update({'last': 'Simmons'}, {'GPA': 3.0})
 
 # Update a single document
 lola['GPA'] = 2.6
 students.update_one(lola)
 
-# Replace all matching document(s)
+# Replace documents by filters
 becky = {'first': 'Becky', 'last': 'Hamilton', 'GPA': '3.3'}
 students.replace({'first': 'Emma'}, becky)
 
@@ -150,7 +151,7 @@ students.replace({'first': 'Emma'}, becky)
 emma['GPA'] = 3.1
 students.replace_one(emma)
 
-# Iterate through all documents and update them
+# Iterate through all documents and update
 for student in students:
     student['GPA'] = 4.0
     student['happy'] = True
@@ -193,7 +194,7 @@ db = client.db('school')
 # List graphs
 db.graphs()
 
-# Create a new graph
+# Create a graph
 schedule = db.create_graph('schedule')
 
 # Create vertex and edge collections for the graph
@@ -205,25 +206,25 @@ teaches = schedule.create_edge_collection(
     to_collections=['classes']
 )
 
-# Retrieve the graph information
+# Retrieve graph information
 schedule.properties()
 
-# List the orphan collections (no edges)
+# List orphan collections (no edges)
 schedule.orphan_collections()
 
-# List the edge collections
+# List edge collections
 schedule.edge_collections()
 
-# List the vertex collections
+# List vertex collections
 schedule.vertex_collections()
 
-# Insert the vertices
+# Insert vertices
 professors.insert_one({'_key': 'michelle', 'name': 'Professor Michelle'})
 classes.insert_one({'_key': 'CSC101', 'name': 'Introduction to CS'})
 classes.insert_one({'_key': 'MAT223', 'name': 'Linear Algebra'})
 classes.insert_one({'_key': 'STA201', 'name': 'Introduction to Statistics'})
 
-# Insert the edges
+# Insert edges
 teaches.insert_one({'_from': 'professors/michelle', '_to': 'classes/CSC101'})
 teaches.insert_one({'_from': 'professors/michelle', '_to': 'classes/STA201'})
 teaches.insert_one({'_from': 'professors/michelle', '_to': 'classes/MAT223'})
@@ -272,6 +273,49 @@ db.query.delete_function('myfunctions::temperature::ctof')
 db.query.cache.clear()
 db.query.cache.set_properties(mode='demand', limit=10000)
 db.query.cache.properties()
+```
+
+Asynchronous Requests
+---------------------
+
+```python
+from arango import ArangoClient
+
+client = ArangoClient()
+
+db = client.db('school').async(return_result=True)
+students = db.collection('students')
+job1 = students.insert_one({'_key': '1', 'name': 'Lola'})
+job2 = students.insert_one({'_key': '2', 'name': 'Abby'})
+job3 = students.insert_one({'_key': '3', 'name': 'John'})
+job4 = students.insert_one({'_key': '4', 'name': 'Emma'})
+
+print(job1.result())
+print(job2.result())
+print(job3.result())
+print(job4.result())
+```
+
+
+Batch Requests
+--------------
+
+```python
+from arango import ArangoClient
+
+client = ArangoClient()
+
+with client.db('school').batch(return_result=True) as db:
+    students = db.collection('students')
+    job1 = students.insert_one({'_key': '1', 'name': 'Lola'})
+    job2 = students.insert_one({'_key': '2', 'name': 'Abby'})
+    job3 = students.insert_one({'_key': '3', 'name': 'John'})
+    job4 = students.insert_one({'_key': '4', 'name': 'Emma'})
+
+print(job1.result())
+print(job2.result())
+print(job3.result())
+print(job4.result())
 ```
 
 Transactions

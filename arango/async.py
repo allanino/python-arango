@@ -50,6 +50,12 @@ class AsyncRequest(Connection):
     def __repr__(self):
         return '<ArangoDB async request object>'
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        pass
+
     def handle_request(self, request, handler):
         """Handle the incoming request and response handler objects.
 

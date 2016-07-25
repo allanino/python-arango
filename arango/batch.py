@@ -40,14 +40,14 @@ class BatchRequest(Connection):
         self._batch_jobs = []  # For tracking batch jobs
         self._query = Query(self)
 
+    def __repr__(self):
+        return '<ArangoDB batch request object>'
+
     def __enter__(self):
         return self
 
     def __exit__(self, *_):
         return self.commit()
-
-    def __repr__(self):
-        return '<ArangoDB batch request object>'
 
     def handle_request(self, request, handler):
         """Handle the incoming request and response handler objects.
