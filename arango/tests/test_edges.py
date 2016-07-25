@@ -847,7 +847,7 @@ def test_add_fulltext_index():
 
     ecol.add_fulltext_index(
         fields=['attr1'],
-        minimum_length=10,
+        min_length=10,
     )
     expected_index = {
         'sparse': True,
@@ -863,7 +863,7 @@ def test_delete_index():
     old_indexes = set(ecol.indexes())
     ecol.add_hash_index(['attr1', 'attr2'], unique=True)
     ecol.add_skiplist_index(['attr1', 'attr2'], unique=True)
-    ecol.add_fulltext_index(fields=['attr1'], minimum_length=10)
+    ecol.add_fulltext_index(fields=['attr1'], min_length=10)
 
     new_indexes = set(ecol.indexes())
     assert new_indexes.issuperset(old_indexes)

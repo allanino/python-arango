@@ -9,24 +9,23 @@ from arango.response import Response
 from arango.query import Query
 
 
-class BatchExecution(Connection):
-    """ArangoDB batch execution object.
+class BatchRequest(Connection):
+    """ArangoDB batch request object.
 
-    API requests via BatchExecution are placed in an in-memory queue inside
-    the object and committed as a whole in a single call.
-
-    If ``return_result`` is set to True, a BatchJob instance is returned each
-    time a request is issued. The BatchJob object can be used to retrieve the
-    result of the corresponding request after the commit.
+    API requests via this class are placed in an in-memory queue committed as
+    a whole in a single HTTP call to the ArangoDB server.
 
     :param connection: ArangoDB database connection object
     :type connection: arango.connection.Connection
-    :param return_result: whether to store and return the result
+    :param return_result: If set to `True`, a :class:`arango.batch.BatchJob`
+        instance is returned each time a request is issued. The instance can
+        be used to retrieve the result of the corresponding request after the
+        commit.
     :type return_result: bool
     """
 
     def __init__(self, connection, return_result=True):
-        super(BatchExecution, self).__init__(
+        super(BatchRequest, self).__init__(
             protocol=connection.protocol,
             host=connection.host,
             port=connection.port,
@@ -48,26 +47,22 @@ class BatchExecution(Connection):
         return self.commit()
 
     def __repr__(self):
-        return '<ArangoDB batch execution object>'
+        return '<ArangoDB batch request object>'
 
     def handle_request(self, request, handler):
         """Handle the incoming request and response handler objects.
 
-        This method designed to be used internally only.
-
-        The ``request`` and its corresponding ``handler`` are queued as part
-        of the current batch execution scope, and run only when the batch is
-        committed via the BatchExecution.commit method.
-
-        If ``return_response`` was set to True during the initialization of
-        the BatchExecution object, a BatchJob instance is returned.
-
-        :param request: ArangoDB request object
+        :param request: ArangoDB request object queued as part of the current
+            batch request scope, and run only when the batch is committed
+            via :func:`~arango.Batch.commit`
         :type request: arango.request.Request
         :param handler: ArangoDB response handler
         :type handler: callable
         :returns: the batch job or None
         :rtype: arango.batch.BatchJob | None
+
+        .. Note::
+            This method designed to be used internally only.
         """
         self._requests.append(request)
         self._handlers.append(handler)
@@ -81,10 +76,10 @@ class BatchExecution(Connection):
         """Execute the API requests in a single HTTP call.
 
         If ``return_response`` was set to True during the initialization of
-        the BatchExecution object, the responses are returned and also saved
-        within the object for later retrieval (via the BatchExecution.result
+        the BatchRequest object, the responses are returned and also saved
+        within the object for later retrieval (via the BatchRequest.result
         method). The responses are ordered with respect to the order the
-        requests were originally queued in the BatchExecution instance.
+        requests were originally queued in the BatchRequest instance.
 
         If ``return_response`` was set to False, an empty result set will be
         returned instead and the responses are not saved.
@@ -135,19 +130,19 @@ class BatchExecution(Connection):
                         body=raw_body
                     ))
                 except Exception as err:
-                    job.update(status=BatchJob.Status.ERROR, exception=err)
+                    job.update(status=BatchJob.ERROR, exception=err)
                 else:
-                    job.update(status=BatchJob.Status.DONE, result=result)
+                    job.update(status=BatchJob.DONE, result=result)
         finally:
             self._requests, self._handlers, self._batch_jobs = [], [], []
 
     @property
     def query(self):
-        """Return the query object for the batch execution.
+        """Return the query object for the batch request.
 
         API requests via the returned query object are placed in an in-memory
-        queue inside BatchExecution object and committed as a whole in a single
-        HTTP call.
+        queue inside BatchRequest object and committed as a whole in a single
+        HTTP call to the ArangoDB server.
 
         :returns: ArangoDB query object
         :rtype: arango.query.Query
@@ -155,11 +150,11 @@ class BatchExecution(Connection):
         return self._query
 
     def collection(self, name):
-        """Return a collection object for the batch execution.
+        """Return a collection object for the batch request.
 
         API requests via the returned collection object are placed in an
-        in-memory queue inside BatchExecution object and committed as a
-        whole in a single HTTP call.
+        in-memory queue inside BatchRequest object and committed as a
+        whole in a single HTTP call to the ArangoDB server.
 
         :param name: the name of the collection
         :type name: str
@@ -169,11 +164,11 @@ class BatchExecution(Connection):
         return Collection(self, name)
 
     def graph(self, name):
-        """Return a graph object for the batch execution.
+        """Return a graph object for the batch request.
 
         API requests via the returned graph object are placed in an in-memory
-        queue inside BatchExecution object and committed as a whole in a single
-        HTTP call.
+        queue inside BatchRequest object and committed as a whole in a single
+        HTTP call to the ArangoDB server.
 
         :param name: the name of the graph
         :type name: str
@@ -183,38 +178,30 @@ class BatchExecution(Connection):
         return Graph(self, name)
 
     def c(self, name):
-        """Alias for self.collection."""
+        """Alias for method :func:`~arango.batch.BatchRequest.collection`."""
         return self.collection(name)
 
     def g(self, name):
-        """Alias for self.graph."""
+        """Alias for method :func:`~arango.batch.BatchRequest.graph`."""
         return self.graph(name)
 
 
 class BatchJob(object):
-    """ArangoDB batch job object.
+    """ArangoDB batch job object which holds information of a batch request.
 
     The BatchJob object is used to keep track of the status of a particular
     API request and retrieve the result or error when available.
 
-    When the batch execution is committed, the BatchJob instance is updated
+    When the batch request is committed, the BatchJob instance is updated
     automatically with the result or the error from the particular request.
     """
 
-    class Status:
-        """Batch jobs can have status PENDING/DONE/ERROR.
-
-        PENDING:  the job is still waiting to be committed
-        DONE:     the job completed successfully
-        ERROR:    the job raised an exception
-        """
-
-        PENDING = 'pending'
-        DONE = 'done'
-        ERROR = 'error'
+    PENDING = 'pending'
+    DONE = 'done'
+    ERROR = 'error'
 
     def __init__(self):
-        self._status = self.Status.PENDING
+        self._status = self.PENDING
         self._result = None
         self._exception = None
 
@@ -238,9 +225,9 @@ class BatchJob(object):
     def status(self):
         """Return the status of the job.
 
-        AsyncJob.Status.PENDING: the job is still waiting to be committed
-        AsyncJob.Status.DONE:    the job completed successfully
-        AsyncJob.Status.ERROR:   the job raised an exception
+        AsyncJob.PENDING: the job is still waiting to be committed
+        AsyncJob.DONE:    the job completed successfully
+        AsyncJob.ERROR:   the job raised an exception
 
         :returns: the batch job status
         :rtype: int

@@ -17,10 +17,10 @@ from arango.graph import Graph
 from arango.query import Query
 
 
-class AsyncExecution(Connection):
-    """ArangoDB asynchronous execution object.
+class AsyncRequest(Connection):
+    """ArangoDB asynchronous request object.
 
-    API requests via AsyncExecution are placed in a server-side in-memory task
+    API requests via AsyncRequest are placed in a server-side in-memory task
     queue and executed asynchronously in a fire-and-forget style.
 
     If ``return_result`` is set to True, an AsyncJob instance is returned each
@@ -31,10 +31,11 @@ class AsyncExecution(Connection):
     :type connection: arango.connection.Connection
     :param return_result: whether to store and return the result
     :type return_result: bool
+
     """
 
     def __init__(self, connection, return_result=True):
-        super(AsyncExecution, self).__init__(
+        super(AsyncRequest, self).__init__(
             protocol=connection.protocol,
             host=connection.host,
             port=connection.port,
@@ -47,7 +48,7 @@ class AsyncExecution(Connection):
         self._query = Query(self)
 
     def __repr__(self):
-        return '<ArangoDB async execution object>'
+        return '<ArangoDB async request object>'
 
     def handle_request(self, request, handler):
         """Handle the incoming request and response handler objects.
@@ -58,7 +59,7 @@ class AsyncExecution(Connection):
         server-side in-memory task queue and executed asynchronously.
 
         If ``return_response`` was set to True during the initialization of
-        the AsyncExecution object, an AsyncJob instance is returned.
+        the AsyncRequest object, an AsyncJob instance is returned.
 
         :param request: ArangoDB request object
         :type request: arango.request.Request
@@ -66,6 +67,7 @@ class AsyncExecution(Connection):
         :type handler: callable
         :return: ArangoDB asynchronous job object or None
         :rtype: arango.async.AsyncJob | None
+
         """
         if self._return_result:
             request.headers['x-arango-async'] = 'store'
@@ -88,6 +90,7 @@ class AsyncExecution(Connection):
 
         :returns: ArangoDB query object
         :rtype: arango.query.Query
+
         """
         return self._query
 
@@ -102,6 +105,7 @@ class AsyncExecution(Connection):
         :type name: str
         :returns: the collection object
         :rtype: arango.collection.Collection
+
         """
         return Collection(self, name)
 
@@ -116,6 +120,7 @@ class AsyncExecution(Connection):
         :type name: str
         :returns: the graph object
         :rtype: arango.graph.Graph
+
         """
         return Graph(self, name)
 
@@ -140,20 +145,12 @@ class AsyncJob(object):
     :type job_id: str | None
     :param handler: ArangoDB response handler
     :type handler: callable
+
     """
 
-    class Status:
-        """Asynchronous jobs statuses.
-
-        The status can be one of the following:
-
-        PENDING:  the job is pending in the queue
-        DONE:     the job completed successfully
-        ERROR:    the job raised an exception
-        """
-        PENDING = 'pending'
-        DONE = 'done'
-        ERROR = 'error'
+    PENDING = 'pending'
+    DONE = 'done'
+    ERROR = 'error'
 
     def __init__(self, connection, job_id, handler):
         self._conn = connection
@@ -177,15 +174,16 @@ class AsyncJob(object):
 
         The status can be one of the following:
 
-        BatchJob.Status.PENDING: the job is still pending in the queue
-        BatchJob.Status.DONE:    the job completed successfully
-        BatchJob.Status.ERROR:   the job raised an exception
+        BatchJob.PENDING: the job is still pending in the queue
+        BatchJob.DONE:    the job completed successfully
+        BatchJob.ERROR:   the job raised an exception
 
         :returns: the result of the asynchronous job
         :rtype: int
         :raises: AsyncJobInvalidError,
                  AsyncJobNotFoundError,
                  AsyncJobStatusError
+
         """
         res = self._conn.get('/_api/job/{}'.format(self._id))
         if res.status_code == 204:

@@ -1,4 +1,4 @@
-"""Session based client using requests."""
+"""Session based client using the ``requests`` library."""
 
 import requests
 

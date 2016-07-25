@@ -37,15 +37,15 @@ def test_batch_insert_context_manager_with_result():
     assert col['1']['val'] == 1
     assert col['2']['val'] == 2
 
-    assert batch_job1.status == BatchJob.Status.DONE
+    assert batch_job1.status == BatchJob.DONE
     assert batch_job1.result()['_key'] == '1'
     assert batch_job1.exception() is None
 
-    assert batch_job2.status == BatchJob.Status.DONE
+    assert batch_job2.status == BatchJob.DONE
     assert batch_job2.result()['_key'] == '2'
     assert batch_job2.exception() is None
 
-    assert batch_job3.status == BatchJob.Status.ERROR
+    assert batch_job3.status == BatchJob.ERROR
     assert batch_job3.result() is None
     assert isinstance(batch_job3.exception(), DocumentInsertError)
 
@@ -76,15 +76,15 @@ def test_batch_insert_no_context_manager_with_result():
     batch_job3 = batch_col.insert_one({'_key': '2', 'val': 3})
 
     assert len(col) == 0
-    assert batch_job1.status == BatchJob.Status.PENDING
+    assert batch_job1.status == BatchJob.PENDING
     assert batch_job1.result() is None
     assert batch_job1.exception() is None
 
-    assert batch_job2.status == BatchJob.Status.PENDING
+    assert batch_job2.status == BatchJob.PENDING
     assert batch_job2.result() is None
     assert batch_job2.exception() is None
 
-    assert batch_job3.status == BatchJob.Status.PENDING
+    assert batch_job3.status == BatchJob.PENDING
     assert batch_job3.result() is None
     assert batch_job3.exception() is None
 
@@ -93,15 +93,15 @@ def test_batch_insert_no_context_manager_with_result():
     assert col['1']['val'] == 1
     assert col['2']['val'] == 2
 
-    assert batch_job1.status == BatchJob.Status.DONE
+    assert batch_job1.status == BatchJob.DONE
     assert batch_job1.result()['_key'] == '1'
     assert batch_job1.exception() is None
 
-    assert batch_job2.status == BatchJob.Status.DONE
+    assert batch_job2.status == BatchJob.DONE
     assert batch_job2.result()['_key'] == '2'
     assert batch_job2.exception() is None
 
-    assert batch_job3.status == BatchJob.Status.ERROR
+    assert batch_job3.status == BatchJob.ERROR
     assert batch_job3.result() is None
     assert isinstance(batch_job3.exception(), DocumentInsertError)
 

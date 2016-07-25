@@ -824,7 +824,7 @@ def test_add_fulltext_index():
 
     col.add_fulltext_index(
         fields=['attr1'],
-        minimum_length=10,
+        min_length=10,
     )
     expected_index = {
         'sparse': True,
@@ -840,7 +840,7 @@ def test_delete_index():
     old_indexes = set(col.indexes())
     col.add_hash_index(['attr1', 'attr2'], unique=True)
     col.add_skiplist_index(['attr1', 'attr2'], unique=True)
-    col.add_fulltext_index(fields=['attr1'], minimum_length=10)
+    col.add_fulltext_index(fields=['attr1'], min_length=10)
 
     new_indexes = set(col.indexes())
     assert new_indexes.issuperset(old_indexes)

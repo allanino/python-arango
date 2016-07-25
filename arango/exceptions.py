@@ -526,7 +526,7 @@ class TransactionGetError(ArangoError):
 
 
 ####################
-# BatchExecution Exceptions #
+# BatchRequest Exceptions #
 ####################
 
 

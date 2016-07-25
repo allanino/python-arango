@@ -128,8 +128,8 @@ class Graph(APIWrapper):
 
         :param name: the name of the vertex collection to create
         :type name: str
-        :returns: whether the operation was successful
-        :rtype: bool
+        :returns: the vertex collection object
+        :rtype: arango.collection.VertexCollection
         :raises: VertexCollectionCreateError
         """
         request = Request(
@@ -141,7 +141,7 @@ class Graph(APIWrapper):
         def handler(res):
             if res.status_code not in HTTP_OK:
                 raise VertexCollectionCreateError(res)
-            return not res.body['error']
+            return VertexCollection(self._conn, self._name, name)
 
         return request, handler
 
@@ -212,8 +212,8 @@ class Graph(APIWrapper):
         :type from_collections: list
         :param to_collections: the names of the ``to`` vertex collections
         :type to_collections: list
-        :returns: whether the operation was successful
-        :rtype: bool
+        :returns: the edge collection object
+        :rtype: arango.collection.EdgeCollection
         :raises: EdgeDefinitionCreateError
         """
         request = Request(
@@ -229,7 +229,7 @@ class Graph(APIWrapper):
         def handler(res):
             if res.status_code not in HTTP_OK:
                 raise EdgeDefinitionCreateError(res)
-            return not res.body['error']
+            return EdgeCollection(self._conn, self._name, name)
 
         return request, handler
 
@@ -294,8 +294,7 @@ class Graph(APIWrapper):
     ####################
 
     def traverse(self,
-                 vertex_collection,
-                 vertex_key,
+                 start_vertex,
                  direction=None,
                  strategy=None,
                  order=None,
@@ -312,10 +311,6 @@ class Graph(APIWrapper):
                  expander_func=None):
         """Traverse the graph and return the visited vertices and edges.
 
-
-        ``max_iter`` can be set to avoid endless loops in cyclic graphs. When
-        the ``max_iter`` is reached the traversal aborts.
-
         ``init_func`` is a Java
 
          must be a JavaScript function (str) with signature:
@@ -329,10 +324,8 @@ class Graph(APIWrapper):
         and must return
 
 
-        :param vertex_collection: the name of the vertex collection
-        :type: vertex_collection: str
-        :param vertex_key: the vertex document key
-        :type vertex_key: str
+        :param start_vertex: the ID of the start vertex
+        :type start_vertex: str
         :param direction: "outbound", "inbound" or "any" (default)
         :type direction: str
         :param strategy: "dfs" or "bfs"
@@ -345,13 +338,15 @@ class Graph(APIWrapper):
         :type vertex_uniqueness: str
         :param edge_uniqueness: "none", "global" or "path"
         :type edge_uniqueness: str
-        :param max_iter: the max number of iterations in each traversal
+        :param max_iter: halt the graph traversal aborts after the max number
+            of iterations (set this flag to prevent endless loops in cyclic
+            graphs)
         :type max_iter: int
         :param min_depth: the minimum depth of the nodes to visit
         :type min_depth: int
         :param max_depth: the maximum depth of the nodes to visit
         :type max_depth: int
-        :param init_func: custom initialize function (in JavaScript)
+        :param init_func: custom initialize function (in JavaScript) with
         :type init_func: str
         :param sort_func: custom sort function (in JavaScript)
         :type sort_func: str
@@ -366,15 +361,14 @@ class Graph(APIWrapper):
         :rtype: dict
         :raises: GraphTraverseError
         """
-        vertex_id = '{}/{}'.format(vertex_collection, vertex_key)
-
         if expander_func is None and direction is None:
             direction = 'any'
 
-        if strategy.lower() == 'dfs':
-            strategy = 'depthfirst'
-        elif strategy.lower() == 'bfs':
-            strategy = 'breadthfirst'
+        if strategy is not None:
+            if strategy.lower() == 'dfs':
+                strategy = 'depthfirst'
+            elif strategy.lower() == 'bfs':
+                strategy = 'breadthfirst'
 
         uniqueness = {}
         if vertex_uniqueness is not None:
@@ -383,25 +377,32 @@ class Graph(APIWrapper):
             uniqueness['edges'] = edge_uniqueness
 
         data = {
-            "startVertex": vertex_id,
-            "graphName": self._name,
-            "direction": direction,
-            "strategy": strategy,
-            "order": order,
-            "itemOrder": item_order,
-            "uniqueness": uniqueness or None,
-            "maxIterations": max_iter,
-            "minDepth": min_depth,
-            "maxDepth": max_depth,
-            "init": init_func,
-            "filter": filter_func,
-            "visitor": visitor_func,
-            "sort": sort_func
+            'startVertex': start_vertex,
+            'graphName': self._name,
+            'direction': direction,
+            'strategy': strategy,
+            'order': order,
+            'itemOrder': item_order,
+            'uniqueness': uniqueness or None,
+            'maxIterations': max_iter,
+            'minDepth': min_depth,
+            'maxDepth': max_depth,
+            'init': init_func,
+            'filter': filter_func,
+            'visitor': visitor_func,
+            'sort': sort_func
         }
         data = {k: v for k, v in data.items() if v is not None}
-        res = self._conn.post(
-            "/_api/traversal",
-            data=data)
-        if res.status_code not in HTTP_OK:
-            raise GraphTraverseError(res)
-        return res.body["result"]
+
+        request = Request(
+            method='post',
+            endpoint='/_api/traversal',
+            data=data
+        )
+
+        def handler(res):
+            if res.status_code not in HTTP_OK:
+                raise GraphTraverseError(res)
+            return res.body['result']
+
+        return request, handler

@@ -1012,7 +1012,7 @@ class BaseCollection(APIWrapper):
             data['unique'] = unique
         return self._add_index(data)
 
-    def add_fulltext_index(self, fields, minimum_length=None):
+    def add_fulltext_index(self, fields, min_length=None):
         """Create a fulltext index to the collection.
 
         A fulltext index is used to find words or prefixes of words. Only words
@@ -1023,13 +1023,16 @@ class BaseCollection(APIWrapper):
 
         :param fields: the field to index
         :type fields: list
-        :param minimum_length: the minimum number of characters to index
-        :type minimum_length: int
+        :param min_length: the minimum number of characters to index
+        :type min_length: int
         :raises: IndexCreateError
         """
+        if len(fields) > 1:
+            raise ValueError('Only one field is currently supported')
+
         data = {'type': 'fulltext', 'fields': fields}
-        if minimum_length is not None:
-            data['minLength'] = minimum_length
+        if min_length is not None:
+            data['minLength'] = min_length
         return self._add_index(data)
 
     def delete_index(self, index_id):

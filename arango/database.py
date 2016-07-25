@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 
-from arango.async import AsyncExecution
-from arango.batch import BatchExecution
+from arango.async import AsyncRequest
+from arango.batch import BatchRequest
 from arango.collection import Collection
 from arango.constants import HTTP_OK
 from arango.exceptions import *
@@ -48,28 +48,28 @@ class Database(object):
         return self._query
 
     def async(self, return_result=True):
-        """Return the async execution object.
+        """Return the async request object.
 
-        API requests via async execution objects are placed in a server-side,
+        API requests via async request objects are placed in a server-side,
         in-memory task queue and executed asynchronously in a fire-and-forget
         style.
 
         If ``return_result`` is set to True, an AsyncJob instance is returned
-        each time a request is issued through the async execution objects.
+        each time a request is issued through the async request objects.
         AsyncJob objects can be used to keep track of the status of the request
         and retrieve the result.
 
         :param return_result: whether to store and return the result
         :type return_result: bool
-        :return: the async execution object
-        :rtype: arango.async.AsyncExecution
+        :return: the async request object
+        :rtype: arango.async.AsyncRequest
         """
-        return AsyncExecution(self._conn, return_result)
+        return AsyncRequest(self._conn, return_result)
 
     def batch(self, return_result=True):
-        """Return the batch execution object.
+        """Return the batch request object.
 
-        API requests via batch execution objects are placed in an in-memory
+        API requests via batch request objects are placed in an in-memory
         queue inside the object and committed as a whole in a single call.
 
         If ``return_result`` is set to True, a BatchJob instance is returned
@@ -78,10 +78,10 @@ class Database(object):
 
         :param return_result: whether to store and return the result
         :type return_result: bool
-        :return: the batch execution object
-        rtype: arango.batch.BatchExecution
+        :return: the batch request object
+        rtype: arango.batch.BatchRequest
         """
-        return BatchExecution(self._conn, return_result)
+        return BatchRequest(self._conn, return_result)
 
     def transaction(self, return_result=True):
         return Transaction(self._conn, return_result)
