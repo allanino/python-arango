@@ -29,6 +29,7 @@ class Connection(object):
     :type http_client: arango.clients.base.BaseHTTPClient | None
     :param enable_logging: log all API requests
     :type enable_logging: bool
+
     """
 
     def __init__(self,
@@ -61,10 +62,22 @@ class Connection(object):
 
     @property
     def protocol(self):
+        """Return the internet transfer protocol.
+
+        :return: the internet transfer protocol
+        :rtype: str
+
+        """
         return self._protocol
 
     @property
     def host(self):
+        """Return the ArangoDB host.
+
+        :return: the ArangoDB host
+        :rtype: str
+
+        """
         return self._host
 
     @property
