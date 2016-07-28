@@ -1028,7 +1028,7 @@ class BaseCollection(APIWrapper):
         :raises: IndexCreateError
         """
         if len(fields) > 1:
-            raise ValueError('Only one field is currently supported')
+            raise IndexCreateError('Only one field is currently supported')
 
         data = {'type': 'fulltext', 'fields': fields}
         if min_length is not None:

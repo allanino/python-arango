@@ -324,7 +324,7 @@ class Graph(APIWrapper):
         and must return
 
 
-        :param start_vertex: the ID of the start vertex
+        :param start_vertex: the ID of the start vertex (e.g. "collection/key")
         :type start_vertex: str
         :param direction: "outbound", "inbound" or "any" (default)
         :type direction: str

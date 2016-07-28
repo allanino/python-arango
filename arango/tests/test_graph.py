@@ -3,6 +3,10 @@ from __future__ import absolute_import, unicode_literals
 import pytest
 
 from arango import ArangoClient
+from arango.collection import (
+    VertexCollection,
+    EdgeCollection
+)
 from arango.exceptions import *
 from arango.tests.utils import (
     generate_db_name,
@@ -65,7 +69,9 @@ def test_properties():
 def test_create_vertex_collection():
     # Check preconditions
     assert graph.vertex_collections() == []
-    assert graph.create_vertex_collection('vcol1') is True
+    vcol1 = graph.create_vertex_collection('vcol1')
+    assert isinstance(vcol1, VertexColl)
+
     assert graph.vertex_collections() == ['vcol1']
     assert graph.orphan_collections() == ['vcol1']
     assert 'vcol1' in db.collections()
@@ -840,4 +846,4 @@ def test_delete_edge():
 
 @pytest.mark.order19
 def test_traverse():
-    graph.traverse()
+    pass
