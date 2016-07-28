@@ -82,18 +82,37 @@ class Connection(object):
 
     @property
     def port(self):
+        """Return the ArangoDB port.
+
+        :return: the ArangoDB port
+        :rtype: int
+
+        """
         return self._port
 
     @property
     def username(self):
+        """Return the ArangoDB username.
+
+        :return: the ArangoDB username
+        :rtype: int
+
+        """
         return self._username
 
     @property
     def password(self):
+        """Return the ArangoDB user password.
+
+        :return: the ArangoDB user password
+        :rtype: int
+
+        """
         return self._password
 
     @property
     def database(self):
+        """"""
         return self._database
 
     @property
