@@ -33,7 +33,7 @@ def test_properties():
     assert arango_client.protocol == 'http'
     assert arango_client.host == 'localhost'
     assert arango_client.port == 8529
-    assert 'ArangoDB client pointing to' in repr(arango_client)
+    assert 'ArangoDB client for' in repr(arango_client)
 
 
 def test_version():

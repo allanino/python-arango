@@ -4,7 +4,7 @@ from functools import wraps
 
 
 class APIWrapper(object):
-    """ArangoDB API wrapper.
+    """ArangoDB API wrapper base class.
 
     This class is meant to be used internally only.
     """

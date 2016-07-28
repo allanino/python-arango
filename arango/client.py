@@ -15,19 +15,19 @@ from arango.wal import WriteAheadLog
 class ArangoClient(object):
     """ArangoDB Client.
 
-    :param protocol: the internet transfer protocol (default: 'http')
+    :param protocol: the internet transfer protocol (default: "http")
     :type protocol: str
-    :param host: ArangoDB host (default: 'localhost')
+    :param host: ArangoDB host (default: "localhost")
     :type host: str
     :param port: ArangoDB port (default: 8529)
     :type port: int or str
-    :param username: ArangoDB username (default: 'root')
+    :param username: ArangoDB username (default: "root")
     :type username: str
-    :param password: ArangoDB password (default: '')
+    :param password: ArangoDB password (default: "")
     :type password: str
     :param verify: check the connection during initialization
     :type verify: bool
-    :param http_client: the HTTP client instance
+    :param http_client: the HTTP client object
     :type http_client: arango.clients.base.BaseHTTPClient | None
     :param enable_logging: log all API requests
     :type enable_logging: bool
@@ -70,7 +70,7 @@ class ArangoClient(object):
                 raise ServerConnectionError(res)
 
     def __repr__(self):
-        return '<ArangoDB client pointing to "{}">'.format(self._host)
+        return '<ArangoDB client for "{}">'.format(self._host)
 
     @property
     def protocol(self):
@@ -167,19 +167,14 @@ class ArangoClient(object):
         return res.body
 
     def role(self):
-        """Return the role of the server in the cluster if applicable
+        """Return the role of the server in the cluster if any.
 
-        Possible return values are:
-
-        SINGLE:      the server is not in a cluster
-        COORDINATOR: the server is a coordinator in the cluster
-        PRIMARY:     the server is a primary database in the cluster
-        SECONDARY:   the server is a secondary database in the cluster
-        UNDEFINED:   in a cluster, UNDEFINED is returned if the server role
-                     cannot be determined. On a single server, UNDEFINED is
-                     the only possible return value.
-
-        :returns: the server role
+        :returns: the server role whose value can be **SINGLE**: the server is
+            not in a cluster, **COORDINATOR**: the server is a coordinator in
+            the cluster, **PRIMARY**: the server is a primary database in the
+            cluster, **SECONDARY**: the server is a secondary database in the
+            cluster, or **UNDEFINED**: the server cannot be determined (the
+            only possible value for a single server)
         :rtype: str
         :raises: ServerRoleGetError
 
@@ -190,7 +185,7 @@ class ArangoClient(object):
         return res.body.get('role')
 
     def time(self):
-        """Return the current system time on the server side.
+        """Return the current server system time.
 
         :returns: the system time
         :rtype: datetime.datetime
@@ -212,7 +207,7 @@ class ArangoClient(object):
 
         :returns: the list of endpoints
         :rtype: list
-        :raises EndpointsGetError
+        :raises: EndpointsGetError
 
         """
         res = self._conn.get('/_api/endpoint')

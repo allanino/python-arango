@@ -311,20 +311,8 @@ class Graph(APIWrapper):
                  expander_func=None):
         """Traverse the graph and return the visited vertices and edges.
 
-        ``init_func`` is a Java
-
-         must be a JavaScript function (str) with signature:
-        (config, result) -> void, and is used to initialize any values in result argument
-
-        ``sort_func`` must be a JavaScript function with signature:
-        (left, right) -> integer, and must return -1 if left is smaller than
-        right, +1 if left is greater than right, and 0 if left and right are
-        equal.
-
-        and must return
-
-
-        :param start_vertex: the ID of the start vertex (e.g. "collection/key")
+        :param start_vertex: the collection and the key of the start vertex in
+            the format "collection/key"
         :type start_vertex: str
         :param direction: "outbound", "inbound" or "any" (default)
         :type direction: str
@@ -338,25 +326,37 @@ class Graph(APIWrapper):
         :type vertex_uniqueness: str
         :param edge_uniqueness: "none", "global" or "path"
         :type edge_uniqueness: str
-        :param max_iter: halt the graph traversal aborts after the max number
-            of iterations (set this flag to prevent endless loops in cyclic
-            graphs)
-        :type max_iter: int
         :param min_depth: the minimum depth of the nodes to visit
         :type min_depth: int
         :param max_depth: the maximum depth of the nodes to visit
         :type max_depth: int
-        :param init_func: custom initialize function (in JavaScript) with
+        :param max_iter: halt the graph traversal after a maximum number of
+            iterations (e.g. to prevent endless loops in cyclic graphs)
+        :type max_iter: int
+        :param init_func: init function in JavaScript with signature
+            (config, result) -> void, which is used to initialize values
         :type init_func: str
-        :param sort_func: custom sort function (in JavaScript)
+        :param sort_func: sort function in JavaScript with signature
+            (left, right) -> integer, which returns -1 if left < right,
+            +1 if left > right, and 0 if left == right
         :type sort_func: str
-        :param filter_func: custom filter function (in JavaScript)
+        :param filter_func: filter function in JavaScript with signature
+            (config, vertex, path) -> mixed, where mixed can be one of four
+            possible values: "exclude" (do not visit the vertex), "prune"
+            (do not follow the edges of the vertex), "" or undefined (visit
+            the vertex and its edges), or an Array (any combinations of
+            the "mixed", "prune" or ""/undefined).
         :type filter_func: str
-        :param visitor_func: custom visitor function (in JavaScript)
+        :param visitor_func: visitor function in JavaScript with signature
+            (config, result, vertex, path, connected) -> void, where return
+            value is ignored, result is modified by reference, and connected
+            is populated only when ``order`` is set to "preorder-expander"
         :type visitor_func: str
-        :param expander_func: customer expander function (in JavaScript)
+        :param expander_func: expander function in JavaScript with signature
+            (config, vertex, path) -> mixed, which must return an array of the
+            connections for vertex where each connection is an object with
+            attributes edge and vertex
         :type expander_func: str
-
         :returns: the traversal results
         :rtype: dict
         :raises: GraphTraverseError
